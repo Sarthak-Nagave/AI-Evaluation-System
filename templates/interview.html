@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div id="proctorWarning" class="hidden fixed inset-0 bg-red-600 text-white flex items-center justify-center z-50">
+    <div class="text-center">
+        <i class="fas fa-exclamation-triangle text-6xl mb-4"></i>
+        <h2 class="text-3xl font-bold mb-2">WARNING!</h2>
+        <p class="text-xl" id="warningText"></p>
+    </div>
+</div>
+
+<div class="max-w-4xl mx-auto">
+    <div class="bg-white rounded-lg shadow-lg p-6 mb-4">
+        <h1 class="text-3xl font-bold">
+            <i class="fas fa-microphone text-purple-600 mr-2"></i>HR Mock Interview
+        </h1>
+        <p class="text-gray-600 mt-2">Speak your answers. AI will evaluate your communication skills.</p>
+    </div>
+    
+    <div class="bg-yellow-100 border-l-4 border-yellow-500 p-4 mb-4">
+        <p class="text-yellow-900">
+            <i class="fas fa-camera mr-2"></i>Camera and microphone required. Proctoring active.
+        </p>
+    </div>
+    
+    <div id="cameraPreview" class="mb-4 bg-black rounded-lg overflow-hidden" style="height: 200px;">
+        <video id="videoElement" autoplay muted class="w-full h-full object-cover"></video>
+    </div>
+    
+    <div class="bg-white rounded-lg shadow-lg p-6 mb-4">
+        <div class="text-center mb-6">
+            <div id="micStatus" class="inline-block px-4 py-2 rounded-full bg-gray-200">
+                <i class="fas fa-microphone-slash text-gray-600 mr-2"></i>
+                <span>Microphone Off</span>
+            </div>
+        </div>
+        
+        <div class="mb-6">
+            <h3 class="text-xl font-bold mb-3">Interview Questions:</h3>
+            <ul class="list-disc list-inside space-y-2 text-gray-700">
+                <li>Tell me about yourself and your background.</li>
+                <li>What are your greatest strengths and weaknesses?</li>
+                <li>Describe a challenging project you worked on.</li>
+                <li>Where do you see yourself in 5 years?</li>
+                <li>Why should we hire you?</li>
+            </ul>
+        </div>
+        
+        <div class="text-center mb-6">
+            <button id="startRecording" class="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-8 rounded-lg text-lg">
+                <i class="fas fa-microphone mr-2"></i>Start Speaking
+            </button>
+            <button id="stopRecording" class="hidden bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-8 rounded-lg text-lg">
+                <i class="fas fa-stop mr-2"></i>Stop Speaking
+            </button>
+        </div>
+        
+        <div id="transcriptContainer" class="bg-gray-50 p-4 rounded-lg min-h-[200px] mb-4">
+            <h4 class="font-bold mb-2">Live Transcript:</h4>
+            <p id="transcript" class="text-gray-700 whitespace-pre-wrap">Your speech will appear here...</p>
+        </div>
+        
+        <div class="text-center">
+            <button id="submitInterview" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-lg text-lg">
+                <i class="fas fa-check mr-2"></i>Submit Interview
+            </button>
+        </div>
+    </div>
+    
+    <div id="resultsContainer" class="hidden bg-white rounded-lg shadow-lg p-6">
+        <h2 class="text-2xl font-bold mb-4 text-center">Interview Results</h2>
+        <div class="grid grid-cols-2 gap-4 mb-6">
+            <div class="text-center p-4 bg-blue-50 rounded-lg">
+                <p class="text-sm text-gray-600">Communication</p>
+                <p class="text-3xl font-bold text-blue-600" id="commScore">-</p>
+            </div>
+            <div class="text-center p-4 bg-green-50 rounded-lg">
+                <p class="text-sm text-gray-600">Confidence</p>
+                <p class="text-3xl font-bold text-green-600" id="confScore">-</p>
+            </div>
+            <div class="text-center p-4 bg-purple-50 rounded-lg">
+                <p class="text-sm text-gray-600">Clarity</p>
+                <p class="text-3xl font-bold text-purple-600" id="clarScore">-</p>
+            </div>
+            <div class="text-center p-4 bg-orange-50 rounded-lg">
+                <p class="text-sm text-gray-600">Relevance</p>
+                <p class="text-3xl font-bold text-orange-600" id="relScore">-</p>
+            </div>
+        </div>
+        <div class="bg-gray-50 p-4 rounded-lg">
+            <h4 class="font-bold mb-2">AI Feedback:</h4>
+            <p id="feedback" class="text-gray-700"></p>
+        </div>
+        <div class="text-center mt-6">
+            <a href="/student/dashboard" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg">
+                Back to Dashboard
+            </a>
+        </div>
+    </div>
+</div>
+
+<script src="/static/js/proctoring.js"></script>
+<script src="/static/js/interview.js"></script>
+{% endblock %}

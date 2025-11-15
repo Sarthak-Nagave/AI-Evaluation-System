@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="min-h-screen flex items-center justify-center -mt-16">
+    <div class="text-center">
+        <div class="mb-8">
+            <i class="fas fa-brain text-blue-600 text-8xl mb-4"></i>
+            <h1 class="text-5xl font-bold text-gray-800 mb-4">AI Interview Evaluation System</h1>
+            <p class="text-xl text-gray-600 mb-8">Complete AI-powered interview platform with multi-round testing and proctoring</p>
+        </div>
+        
+        <div class="space-x-4">
+            <a href="{{ url_for('login') }}" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg text-lg transition">
+                <i class="fas fa-sign-in-alt mr-2"></i>Login
+            </a>
+            <a href="{{ url_for('register') }}" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-lg text-lg transition">
+                <i class="fas fa-user-plus mr-2"></i>Register
+            </a>
+        </div>
+        
+        <div class="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
+            <div class="bg-white p-6 rounded-lg shadow-md">
+                <i class="fas fa-clipboard-list text-blue-600 text-4xl mb-3"></i>
+                <h3 class="text-xl font-bold mb-2">Round 1: Aptitude</h3>
+                <p class="text-gray-600">AI-generated MCQ tests tailored to your department</p>
+            </div>
+            <div class="bg-white p-6 rounded-lg shadow-md">
+                <i class="fas fa-code text-green-600 text-4xl mb-3"></i>
+                <h3 class="text-xl font-bold mb-2">Round 2: Technical</h3>
+                <p class="text-gray-600">Coding challenges with real-time execution</p>
+            </div>
+            <div class="bg-white p-6 rounded-lg shadow-md">
+                <i class="fas fa-microphone text-purple-600 text-4xl mb-3"></i>
+                <h3 class="text-xl font-bold mb-2">Round 3: HR Interview</h3>
+                <p class="text-gray-600">Voice-based mock interview with AI evaluation</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

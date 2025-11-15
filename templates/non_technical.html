@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div id="proctorWarning" class="hidden fixed inset-0 bg-red-600 text-white flex items-center justify-center z-50">
+    <div class="text-center">
+        <i class="fas fa-exclamation-triangle text-6xl mb-4"></i>
+        <h2 class="text-3xl font-bold mb-2">WARNING!</h2>
+        <p class="text-xl" id="warningText"></p>
+    </div>
+</div>
+
+<div class="max-w-4xl mx-auto">
+    <div class="bg-white rounded-lg shadow-lg p-6 mb-4">
+        <h1 class="text-3xl font-bold">
+            <i class="fas fa-edit text-purple-600 mr-2"></i>Non-Technical Test
+        </h1>
+        <p class="text-gray-600 mt-2">Answer all 4 questions. AI will evaluate your responses.</p>
+    </div>
+    
+    <div class="bg-yellow-100 border-l-4 border-yellow-500 p-4 mb-4">
+        <p class="text-yellow-900">
+            <i class="fas fa-camera mr-2"></i>Proctoring active. Stay in fullscreen.
+        </p>
+    </div>
+    
+    <div id="cameraPreview" class="mb-4 bg-black rounded-lg overflow-hidden" style="height: 120px;">
+        <video id="videoElement" autoplay muted class="w-full h-full object-cover"></video>
+    </div>
+    
+    <div id="questionsContainer">
+    </div>
+    
+    <div class="text-center mt-6">
+        <a href="/student/dashboard" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-6 rounded-lg">
+            <i class="fas fa-arrow-left mr-2"></i>Back to Dashboard
+        </a>
+    </div>
+</div>
+
+<script src="/static/js/proctoring.js"></script>
+<script src="/static/js/non_technical.js"></script>
+{% endblock %}

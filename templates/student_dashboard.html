@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto">
+    <h1 class="text-4xl font-bold mb-8 text-center">
+        <i class="fas fa-user-graduate text-blue-600 mr-3"></i>Student Dashboard
+    </h1>
+    
+    <div class="bg-blue-100 border-l-4 border-blue-500 p-4 mb-8">
+        <p class="text-blue-900">
+            <i class="fas fa-info-circle mr-2"></i>
+            <strong>Department:</strong> {{ current_user.department }}
+        </p>
+    </div>
+    
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="bg-white p-6 rounded-lg shadow-lg border-t-4 {% if aptitude_completed %}border-green-500{% else %}border-blue-500{% endif %}">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-2xl font-bold">Round 1</h3>
+                {% if aptitude_completed %}
+                <i class="fas fa-check-circle text-green-500 text-3xl"></i>
+                {% else %}
+                <i class="fas fa-clock text-blue-500 text-3xl"></i>
+                {% endif %}
+            </div>
+            <h4 class="text-xl font-semibold mb-2">Aptitude Test</h4>
+            <p class="text-gray-600 mb-4">60 MCQ questions covering logical reasoning, quantitative aptitude, and technical knowledge.</p>
+            
+            {% if aptitude_completed %}
+            <button disabled class="w-full bg-gray-400 text-white font-bold py-3 rounded-lg cursor-not-allowed">
+                <i class="fas fa-check mr-2"></i>Completed
+            </button>
+            {% else %}
+            <a href="{{ url_for('aptitude_start') }}" class="block w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg text-center transition">
+                <i class="fas fa-play mr-2"></i>Start Test
+            </a>
+            {% endif %}
+        </div>
+        
+        <div class="bg-white p-6 rounded-lg shadow-lg border-t-4 {% if round2_completed %}border-green-500{% elif aptitude_completed %}border-blue-500{% else %}border-gray-400{% endif %}">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-2xl font-bold">Round 2</h3>
+                {% if round2_completed %}
+                <i class="fas fa-check-circle text-green-500 text-3xl"></i>
+                {% elif aptitude_completed %}
+                <i class="fas fa-clock text-blue-500 text-3xl"></i>
+                {% else %}
+                <i class="fas fa-lock text-gray-400 text-3xl"></i>
+                {% endif %}
+            </div>
+            <h4 class="text-xl font-semibold mb-2">
+                {% if is_technical %}Coding Test{% else %}Non-Technical Test{% endif %}
+            </h4>
+            <p class="text-gray-600 mb-4">
+                {% if is_technical %}
+                4 coding questions including SQL. Test your programming skills.
+                {% else %}
+                4 subjective questions. AI will evaluate your answers.
+                {% endif %}
+            </p>
+            
+            {% if round2_completed %}
+            <button disabled class="w-full bg-gray-400 text-white font-bold py-3 rounded-lg cursor-not-allowed">
+                <i class="fas fa-check mr-2"></i>Completed
+            </button>
+            {% elif aptitude_completed %}
+            <a href="{% if is_technical %}{{ url_for('coding_start') }}{% else %}{{ url_for('non_technical_start') }}{% endif %}" class="block w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg text-center transition">
+                <i class="fas fa-play mr-2"></i>Start Test
+            </a>
+            {% else %}
+            <button disabled class="w-full bg-gray-400 text-white font-bold py-3 rounded-lg cursor-not-allowed">
+                <i class="fas fa-lock mr-2"></i>Complete Round 1 First
+            </button>
+            {% endif %}
+        </div>
+        
+        <div class="bg-white p-6 rounded-lg shadow-lg border-t-4 {% if interview_completed %}border-green-500{% elif round2_completed %}border-blue-500{% else %}border-gray-400{% endif %}">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-2xl font-bold">Round 3</h3>
+                {% if interview_completed %}
+                <i class="fas fa-check-circle text-green-500 text-3xl"></i>
+                {% elif round2_completed %}
+                <i class="fas fa-clock text-blue-500 text-3xl"></i>
+                {% else %}
+                <i class="fas fa-lock text-gray-400 text-3xl"></i>
+                {% endif %}
+            </div>
+            <h4 class="text-xl font-semibold mb-2">HR Mock Interview</h4>
+            <p class="text-gray-600 mb-4">Voice-based interview. AI will evaluate your communication, confidence, and clarity.</p>
+            
+            {% if interview_completed %}
+            <button disabled class="w-full bg-gray-400 text-white font-bold py-3 rounded-lg cursor-not-allowed">
+                <i class="fas fa-check mr-2"></i>Completed
+            </button>
+            {% elif round2_completed %}
+            <a href="{{ url_for('interview_start') }}" class="block w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg text-center transition">
+                <i class="fas fa-play mr-2"></i>Start Interview
+            </a>
+            {% else %}
+            <button disabled class="w-full bg-gray-400 text-white font-bold py-3 rounded-lg cursor-not-allowed">
+                <i class="fas fa-lock mr-2"></i>Complete Round 2 First
+            </button>
+            {% endif %}
+        </div>
+    </div>
+    
+    <div class="mt-8 bg-yellow-100 border-l-4 border-yellow-500 p-4">
+        <p class="text-yellow-900">
+            <i class="fas fa-exclamation-triangle mr-2"></i>
+            <strong>Important:</strong> Anti-cheat system is active. Keep camera on, stay in fullscreen, and don't switch tabs.
+        </p>
+    </div>
+</div>
+{% endblock %}

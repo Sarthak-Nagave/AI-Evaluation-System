@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+
+{% block extra_css %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.23.4/ace.js"></script>
+{% endblock %}
+
+{% block content %}
+<div id="proctorWarning" class="hidden fixed inset-0 bg-red-600 text-white flex items-center justify-center z-50">
+    <div class="text-center">
+        <i class="fas fa-exclamation-triangle text-6xl mb-4"></i>
+        <h2 class="text-3xl font-bold mb-2">WARNING!</h2>
+        <p class="text-xl" id="warningText"></p>
+    </div>
+</div>
+
+<div class="max-w-7xl mx-auto">
+    <div class="bg-white rounded-lg shadow-lg p-6 mb-4">
+        <h1 class="text-3xl font-bold">
+            <i class="fas fa-code text-green-600 mr-2"></i>Coding Test
+        </h1>
+        <p class="text-gray-600 mt-2">Complete all 4 coding questions. One must be SQL.</p>
+    </div>
+    
+    <div class="bg-yellow-100 border-l-4 border-yellow-500 p-4 mb-4">
+        <p class="text-yellow-900">
+            <i class="fas fa-camera mr-2"></i>Proctoring active. Camera on, fullscreen mode required.
+        </p>
+    </div>
+    
+    <div id="cameraPreview" class="mb-4 bg-black rounded-lg overflow-hidden" style="height: 120px;">
+        <video id="videoElement" autoplay muted class="w-full h-full object-cover"></video>
+    </div>
+    
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+        <div id="questionTabs" class="md:col-span-1 space-y-2">
+        </div>
+    </div>
+    
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="bg-white rounded-lg shadow-lg p-6">
+            <h3 class="text-xl font-bold mb-4" id="questionTitle">Select a question</h3>
+            <div id="questionDescription" class="text-gray-700 mb-4 whitespace-pre-line"></div>
+            
+            <div class="mb-4">
+                <label class="block font-bold mb-2">Language</label>
+                <select id="languageSelect" class="px-4 py-2 border rounded-lg">
+                    <option value="python">Python</option>
+                    <option value="c">C</option>
+                    <option value="cpp">C++</option>
+                    <option value="java">Java</option>
+                    <option value="sql">SQL</option>
+                </select>
+            </div>
+            
+            <div class="mb-4">
+                <label class="block font-bold mb-2">Code Editor</label>
+                <div id="editor" style="height: 400px; border: 1px solid #ddd;"></div>
+            </div>
+            
+            <div class="flex space-x-2">
+                <button id="runBtn" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">
+                    <i class="fas fa-play mr-2"></i>Run Code
+                </button>
+                <button id="submitCodeBtn" class="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg">
+                    <i class="fas fa-check mr-2"></i>Submit
+                </button>
+            </div>
+        </div>
+        
+        <div class="bg-white rounded-lg shadow-lg p-6">
+            <h3 class="text-xl font-bold mb-4">Output</h3>
+            <div id="output" class="bg-gray-100 p-4 rounded-lg font-mono text-sm min-h-[200px] whitespace-pre-wrap"></div>
+            
+            <div id="errorOutput" class="hidden bg-red-100 p-4 rounded-lg mt-4 text-red-700 font-mono text-sm"></div>
+        </div>
+    </div>
+    
+    <div class="mt-4 text-center">
+        <a href="/student/dashboard" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-6 rounded-lg">
+            <i class="fas fa-arrow-left mr-2"></i>Back to Dashboard
+        </a>
+    </div>
+</div>
+
+<script src="/static/js/proctoring.js"></script>
+<script src="/static/js/coding.js"></script>
+{% endblock %}
