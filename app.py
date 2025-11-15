@@ -4,6 +4,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from models import db, User, AptitudeQuestion, AptitudeTest, CodingQuestion, CodingTest, NonTechnicalQuestion, NonTechnicalTest, MockInterview, ProctorLog
 from config import Config
 from aptitude_ai import generate_aptitude_questions, evaluate_non_technical_answer, evaluate_mock_interview
+import os
 import requests
 import json
 import random
@@ -26,14 +27,32 @@ login_manager.login_view = 'login'
 
 @login_manager.user_loader
 def load_user(user_id):
-    return User.query.get(int(user_id))
+    return db.session.get(User, int(user_id))
 
 # Initialize database and create admin users
 def init_db():
     with app.app_context():
         db.create_all()
         
-        # Create admin users
+        # Security warning for default password
+        is_production = os.environ.get('FLASK_ENV') == 'production' or os.environ.get('ENVIRONMENT') == 'production'
+        
+        if Config.ADMIN_PASSWORD == 'Nmit@ncer':
+            print("\n" + "="*70)
+            print("⚠️  WARNING: Using default admin password!")
+            print("Please set ADMIN_PASSWORD environment variable for production.")
+            print("Default password should ONLY be used for development/testing.")
+            print("="*70 + "\n")
+            
+            # Production failsafe: abort if in production environment with default password
+            if is_production:
+                print("\n" + "="*70)
+                print("❌ FATAL: Cannot start in production mode with default password!")
+                print("Set ADMIN_PASSWORD environment variable and restart.")
+                print("="*70 + "\n")
+                raise RuntimeError("Production deployment blocked: default admin password detected")
+        
+        # Create admin users (only if they don't exist)
         for email in Config.ADMIN_EMAILS:
             admin = User.query.filter_by(email=email).first()
             if not admin:
@@ -44,6 +63,7 @@ def init_db():
                 )
                 admin.set_password(Config.ADMIN_PASSWORD)
                 db.session.add(admin)
+                print(f"Created admin account: {email}")
         
         # Create default coding questions
         if CodingQuestion.query.count() == 0:
@@ -596,7 +616,9 @@ def get_student_details(student_id):
     if not current_user.is_admin:
         return jsonify({'error': 'Unauthorized'}), 403
     
-    student = User.query.get_or_404(student_id)
+    student = db.session.get(User, student_id)
+    if not student:
+        return jsonify({'error': 'Student not found'}), 404
     
     # Get all test data
     aptitude = AptitudeTest.query.filter_by(user_id=student_id).first()
@@ -686,7 +708,9 @@ def export_student_pdf(student_id):
     if not current_user.is_admin:
         return jsonify({'error': 'Unauthorized'}), 403
     
-    student = User.query.get_or_404(student_id)
+    student = db.session.get(User, student_id)
+    if not student:
+        return jsonify({'error': 'Student not found'}), 404
     
     # Create PDF
     buffer = BytesIO()

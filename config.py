@@ -20,7 +20,7 @@ class Config:
         'omkar01@gmail.com',
         'pranavkale@gmail.com'
     ]
-    ADMIN_PASSWORD = 'Nmit@ncer'
+    ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'Nmit@ncer')
     
     DEPARTMENTS = ['CS', 'AI', 'IT', 'ENTC', 'ENC', 'Mech']
     TECHNICAL_DEPARTMENTS = ['CS', 'AI', 'IT']
