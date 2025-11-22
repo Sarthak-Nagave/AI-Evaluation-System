@@ -5,52 +5,102 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}AI Interview System{% endblock %}</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
-        .no-cache { -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none; }
-        .fullscreen-lock { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 9999; }
+        /* New Professional UI Theme */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #FFFFFF; /* White background */
+        }
+        .btn-primary {
+            @apply bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg transition duration-300 shadow-sm hover:bg-blue-700 active:shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50;
+        }
+        .btn-secondary {
+             @apply bg-gray-200 text-gray-800 font-semibold py-2 px-4 rounded-lg transition duration-300 hover:bg-gray-300;
+        }
+        .card {
+            /* Light gray background for cards, subtle shadow */
+            @apply bg-gray-50 p-6 rounded-xl shadow-sm border border-gray-200;
+        }
+        .input-field {
+            @apply w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150;
+        }
+        .alert-error {
+            @apply bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative;
+        }
+        .alert-success {
+            @apply bg-green-100 border-green-400 text-green-700 px-4 py-3 rounded-lg relative;
+        }
+        .progress-bar {
+            @apply h-2.5 rounded-full bg-blue-500;
+        }
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .modal {
+            @apply bg-white p-8 rounded-xl shadow-2xl w-full max-w-lg;
+        }
+        #editor {
+            height: 400px;
+            width: 100%;
+            border-radius: 0.75rem;
+            border: 1px solid #d1d5db;
+        }
+        /* Prose styles for descriptions */
+        .prose p { @apply mb-4; }
+        .prose code { @apply bg-gray-200 text-sm font-mono px-1 py-0.5 rounded; }
+        .prose pre { @apply bg-gray-100 p-4 rounded-md text-sm overflow-x-auto; }
+        .prose ul { @apply list-disc list-inside ml-4 mb-4; }
     </style>
-    {% block extra_css %}{% endblock %}
+    {% block head %}{% endblock %}
 </head>
-<body class="bg-gray-50 min-h-screen">
-    <nav class="bg-blue-600 text-white shadow-lg">
-        <div class="container mx-auto px-4 py-4">
-            <div class="flex justify-between items-center">
-                <div class="text-2xl font-bold">
-                    <i class="fas fa-brain mr-2"></i>AI Interview System
+<body class="min-h-screen flex flex-col bg-gray-100">
+    
+    <!-- App Navigation Bar (for logged-in users) -->
+    <nav class="bg-white shadow-sm border-b border-gray-200">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <!-- Logo -->
+                <div class="flex items-center space-x-3">
+                    <img class="h-10 w-10" src="https://placehold.co/60x60/3B82F6/FFFFFF?text=NI" alt="Nutan Institutions Logo">
+                    <div>
+                        <h1 class="text-lg font-bold text-gray-900">{% block nav_title %}AI Interview System{% endblock %}</h1>
+                        <p class="text-xs text-gray-500">Interview Evaluation System</p>
+                    </div>
                 </div>
-                <div class="space-x-4">
+                
+                <!-- User Menu -->
+                <div class="flex items-center space-x-4">
                     {% if current_user.is_authenticated %}
-                        <span class="text-blue-100">Welcome, {{ current_user.name }}</span>
-                        <a href="{{ url_for('logout') }}" class="bg-red-500 hover:bg-red-600 px-4 py-2 rounded transition">
-                            <i class="fas fa-sign-out-alt mr-1"></i>Logout
+                        <span class="text-gray-700 text-sm hidden sm:inline">Welcome, <b>{{ current_user.first_name }}</b></span>
+                        <div class="h-8 w-8 rounded-full bg-blue-600 flex items-center justify-center text-white font-semibold text-sm">
+                            {{ current_user.first_name[0] | upper }}{{ current_user.last_name[0] | upper }}
+                        </div>
+                        <a href="{{ url_for('logout') }}" class="text-gray-500 hover:text-gray-800" title="Logout">
+                            <i class="fas fa-sign-out-alt text-lg"></i>
                         </a>
+                    {% else %}
+                        <!-- This nav is for logged-in users, but providing fallback -->
+                        <a href="{{ url_for('login') }}" class="btn-primary">Sign In</a>
                     {% endif %}
                 </div>
             </div>
         </div>
     </nav>
-
-    <main class="container mx-auto px-4 py-8">
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                    <div class="bg-{{ 'green' if category == 'success' else 'red' }}-100 border border-{{ 'green' if category == 'success' else 'red' }}-400 text-{{ 'green' if category == 'success' else 'red' }}-700 px-4 py-3 rounded mb-4">
-                        {{ message }}
-                    </div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
-
+    
+    <!-- Main Content Area -->
+    <main class="flex-grow py-10 px-4 sm:px-6 lg:px-8">
         {% block content %}{% endblock %}
     </main>
-
-    <footer class="bg-gray-800 text-white mt-auto py-6">
-        <div class="container mx-auto px-4 text-center">
-            <p>&copy; 2025 AI Interview Evaluation System. All rights reserved.</p>
-        </div>
-    </footer>
-
-    {% block scripts %}{% endblock %}
 </body>
 </html>

@@ -11,9 +11,15 @@ class User(UserMixin, db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(120), unique=True, nullable=False, index=True)
-    name = db.Column(db.String(100), nullable=False)
+    
+    # --- UI UPDATE: Split 'name' into 'first_name' and 'last_name' ---
+    first_name = db.Column(db.String(100), nullable=False)
+    last_name = db.Column(db.String(100), nullable=False)
+    
+    prn = db.Column(db.String(50), unique=True, nullable=True) 
     password_hash = db.Column(db.String(255), nullable=False)
-    department = db.Column(db.String(20))
+    department = db.Column(db.String(100)) 
+    institute = db.Column(db.String(100)) 
     is_admin = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
@@ -23,6 +29,11 @@ class User(UserMixin, db.Model):
     mock_interviews = db.relationship('MockInterview', backref='student', lazy=True, cascade='all, delete-orphan')
     proctor_logs = db.relationship('ProctorLog', backref='student', lazy=True, cascade='all, delete-orphan')
     
+    # Helper property to get full name
+    @property
+    def name(self):
+        return f"{self.first_name} {self.last_name}"
+
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
     
@@ -33,7 +44,7 @@ class AptitudeQuestion(db.Model):
     __tablename__ = 'aptitude_questions'
     
     id = db.Column(db.Integer, primary_key=True)
-    department = db.Column(db.String(20), nullable=False, index=True)
+    department = db.Column(db.String(100), nullable=False, index=True) 
     question = db.Column(db.Text, nullable=False)
     option_a = db.Column(db.String(500), nullable=False)
     option_b = db.Column(db.String(500), nullable=False)

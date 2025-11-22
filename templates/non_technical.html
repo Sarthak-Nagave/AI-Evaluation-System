@@ -1,42 +1,224 @@
 {% extends "base.html" %}
 
+{% block title %}Round 2 — Non‑Technical Assessment{% endblock %}
+
+{% block head %}
+<style>
+:root{ --primary:#2563eb; --accent:#60a5fa; --danger:#ef4444; --muted:#6b7280; --card:#ffffff; }
+body{ background: linear-gradient(180deg,#fbfdff 0%, #f8fafc 100%); }
+.container-lg{ max-width:1100px; margin:0 auto; padding:26px; }
+
+/* Proctor bar */
+.proctor-bar{ position:sticky; top:12px; z-index:60; display:flex; justify-content:space-between; align-items:center; gap:12px; background:var(--card); border:1px solid #e6eefc; padding:12px 16px; border-radius:12px; box-shadow:0 10px 30px rgba(2,6,23,0.06); flex-wrap:wrap; }
+.proctor-left{ display:flex; gap:16px; align-items:center; }
+.proctor-right{ display:flex; gap:12px; align-items:center; }
+.timer-badge{ font-weight:800; color:var(--danger); font-size:18px; background:#fff6f6; padding:8px 12px; border-radius:10px; border:1px solid #fee2e2; }
+
+/* Jumping boxes */
+.jump-bar{ display:flex; gap:8px; padding:8px; overflow-x:auto; }
+.jump-btn{ min-width:46px; height:46px; border-radius:10px; border:1px solid #e6eefc; background:#f8fafc; display:inline-flex; align-items:center; justify-content:center; font-weight:700; cursor:pointer; transition:transform .12s, box-shadow .12s; }
+.jump-btn:hover{ transform:translateY(-4px); box-shadow:0 8px 20px rgba(37,99,235,0.06); }
+.not-answered{ background:#fff1f2; color:#b91c1c; border-color:#fbcaca; }
+.answered{ background:#ecfdf5; color:#065f46; border-color:#bbf7d0; }
+.current-q{ outline:3px solid rgba(37,99,235,0.12); transform:scale(1.03); }
+
+/* Layout */
+.question-card{ background:var(--card); border-radius:12px; border:1px solid #e6eefc; padding:20px; margin-bottom:18px; box-shadow:0 8px 26px rgba(2,6,23,0.04); }
+.q-title{ font-weight:800; color:#0f172a; margin-bottom:8px; font-size:18px; }
+.q-desc{ color:#334155; margin-bottom:12px; }
+.textarea{ width:100%; min-height:360px; border:1px solid #e6eefc; border-radius:12px; padding:14px; font-size:15px; resize:vertical; background:#fff; }
+.btn{ padding:10px 16px; border-radius:10px; font-weight:700; border:none; cursor:pointer; }
+.btn-primary{ background:var(--primary); color:#fff; }
+.btn-ghost{ background:#eef2ff; color:var(--primary); border:1px solid #dbeafe; }
+.btn-danger{ background:var(--danger); color:#fff; }
+.muted{ color:var(--muted); font-size:13px; }
+.center{ text-align:center; }
+
+/* start modal & confirm modal */
+.modal-backdrop{ position:fixed; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(2,6,23,0.45); z-index:90; }
+.modal-card{ background:white; padding:22px; border-radius:12px; width:420px; text-align:center; }
+
+@media (max-width:980px){ .question-card{ padding:14px; } .textarea{ min-height:220px; } }
+</style>
+
+<script>
+/* ====== Config ====== */
+const ROUND_NAME = 'NonTechnical';
+const EXAM_SECONDS = 90 * 60; // 90 minutes
+let questions = []; // fetched from backend
+let currentIndex = 0;
+let answersMeta = {}; // qid -> { submitted }
+let submissions = {}; // qid -> { answer }
+let timerInterval = null;
+
+/* ====== Utility ====== */
+function secondsToHms(sec){ const h=Math.floor(sec/3600).toString().padStart(2,'0'); const m=Math.floor((sec%3600)/60).toString().padStart(2,'0'); const s=Math.floor(sec%60).toString().padStart(2,'0'); return `${h}:${m}:${s}`; }
+
+/* ====== Proctoring helpers ====== */
+async function logViolation(type, details={}){
+  try{ await fetch('{{ url_for("log_violation") }}',{ method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({type, round: ROUND_NAME, details}) }); }
+  catch(e){ console.error('logViolation',e); }
+}
+
+document.addEventListener('contextmenu', e=>{ e.preventDefault(); logViolation('RIGHT_CLICK'); showModal('Violation','Right click disabled',1200); });
+document.addEventListener('keydown', e=>{ if(e.key==='F12' || ((e.ctrlKey||e.metaKey)&&e.shiftKey&&['I','J','C'].includes(e.key.toUpperCase()))) { e.preventDefault(); logViolation('DEVTOOLS'); showModal('Violation','Developer tools disabled',1200); } });
+document.addEventListener('visibilitychange', ()=>{ if(document.hidden){ logViolation('TAB_SWITCH'); showModal('Violation','Do not switch tabs',1200); } });
+
+/* ====== Camera & fullscreen ====== */
+async function startCamera(){ const v=document.getElementById('cameraFeed'); if(!v) return; try{ const s = await navigator.mediaDevices.getUserMedia({video:true}); v.srcObject = s; }catch(e){ console.warn('camera denied',e); logViolation('CAM_DENIED'); const holder=document.getElementById('camera-holder'); if(holder) holder.innerHTML = '<div class="muted text-red-600 text-sm">Camera denied — flagged</div>'; } }
+async function requestFullscreen(){ if(!document.fullscreenElement){ try{ await document.documentElement.requestFullscreen(); }catch(e){ console.warn('fs failed',e); } } }
+document.addEventListener('fullscreenchange', ()=>{ if(!document.fullscreenElement){ logViolation('EXIT_FULLSCREEN'); requestFullscreen(); } });
+
+/* ====== Timer ====== */
+function startTimer(){ const end = Date.now() + EXAM_SECONDS*1000; const el = document.getElementById('timer-display'); timerInterval = setInterval(()=>{ const remaining = Math.max(0, Math.round((end - Date.now())/1000)); el.textContent = secondsToHms(remaining); if(remaining<=0){ clearInterval(timerInterval); autoSubmitAll(); } },1000); }
+
+/* ====== Fetch questions ====== */
+async function fetchQuestions(){ try{ const res = await fetch('{{ url_for("get_non_technical_questions") }}'); const data = await res.json(); questions = data.questions || []; if(questions.length===0){ showModal('No questions','No questions available for this round.',0); return; }
+    // init metadata
+    for(let i=0;i<questions.length;i++){ const q=questions[i]; answersMeta[q.id] = { submitted: !!q.submitted }; submissions[q.id] = { answer: q.answer || '' }; }
+    renderJumpButtons(); renderQuestion();
+  }catch(e){ console.error('fetchQuestions',e); showModal('Error','Could not load questions. Check connection.',0); }
+}
+
+/* ====== Jump Buttons ====== */
+function renderJumpButtons(){ const bar = document.getElementById('jump-bar'); bar.innerHTML=''; for(let i=0;i<questions.length;i++){ const btn = document.createElement('button'); btn.className='jump-btn not-answered'; btn.id=`jump-${i}`; btn.textContent=(i+1); btn.onclick=(()=>{ return function(){ currentIndex = i; renderQuestion(); highlightJump(); scrollToTop(); }; })(); bar.appendChild(btn); } highlightJump(); }
+function highlightJump(){ for(let i=0;i<questions.length;i++){ const btn=document.getElementById(`jump-${i}`); if(!btn) continue; btn.classList.remove('not-answered','answered','current-q'); const qid = questions[i].id; if(answersMeta[qid] && answersMeta[qid].submitted) btn.classList.add('answered'); else if(i===currentIndex) btn.classList.add('current-q'); else btn.classList.add('not-answered'); } updateFinishButton(); }
+
+/* ====== Render question (one per page) ====== */
+function renderQuestion(){ const q = questions[currentIndex]; if(!q) return; document.getElementById('q-title').textContent = q.title || `Question ${currentIndex+1}`; document.getElementById('q-desc').innerHTML = q.question || q.description || ''; document.getElementById('question-progress').textContent = (currentIndex+1); document.getElementById('total-questions').textContent = questions.length;
+  const ta = document.getElementById('answer-textarea'); const sub = submissions[q.id]; if(sub && sub.answer && answersMeta[q.id].submitted){ ta.value = sub.answer; ta.disabled = true; document.getElementById('submit-btn').disabled = true; document.getElementById('submit-btn').textContent = 'Submitted'; } else { ta.value = sub ? sub.answer : ''; ta.disabled = false; document.getElementById('submit-btn').disabled = false; document.getElementById('submit-btn').textContent = 'Submit Answer'; }
+}
+
+/* ====== Scroll helper ====== */
+function scrollToTop(){ window.scrollTo({ top: document.querySelector('.proctor-bar').offsetTop - 12, behavior:'smooth' }); }
+
+/* ====== Submit one answer ====== */
+async function submitAnswer(){ const q = questions[currentIndex]; if(!q) return; const ta = document.getElementById('answer-textarea'); const ans = ta.value.trim(); if(!ans){ showConfirmModal('Blank Answer','You are about to submit a blank answer. Continue?', async ()=>{ await doSubmit(q, ans); }); return; } await doSubmit(q, ans); }
+
+async function doSubmit(q, ans){ const submitBtn = document.getElementById('submit-btn'); submitBtn.disabled = true; submitBtn.textContent = 'Submitting...'; try{ const res = await fetch('{{ url_for("submit_non_technical") }}', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ question_id: q.id, answer: ans }) }); const data = await res.json(); if(res.ok && data.success){ submissions[q.id] = { answer: ans }; answersMeta[q.id].submitted = true; showModal('Submitted', data.message || 'Answer submitted and scored.', 2000, 'text-green-600'); document.getElementById('submit-btn').textContent = 'Submitted'; document.getElementById('answer-textarea').disabled = true; // update UI
+      // store score/feedback in local questions for preview if provided
+      q.submitted = true; q.score = data.score ?? null; q.feedback = data.feedback ?? null; renderQuestion(); highlightJump();
+    } else { showModal('Error', data.message || 'Submission failed', 0); submitBtn.disabled = false; submitBtn.textContent = 'Submit Answer'; }
+  }catch(e){ console.error('submit error',e); showModal('Error','Network error while submitting',0); document.getElementById('submit-btn').disabled = false; document.getElementById('submit-btn').textContent = 'Submit Answer'; }
+  updateFinishButton(); }
+
+/* ====== Auto submit on timeup (simple) ====== */
+async function autoSubmitAll(){ showModal('Time Up','Time is over. Auto-submitting available answers...',3000,'text-red-600'); for(let i=0;i<questions.length;i++){ const q=questions[i]; if(answersMeta[q.id] && answersMeta[q.id].submitted) continue; try{ await fetch('{{ url_for("submit_non_technical") }}', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ question_id: q.id, answer: submissions[q.id] ? submissions[q.id].answer : '' }) }); answersMeta[q.id].submitted = true; }catch(e){ console.error('auto submit',e); } } setTimeout(()=>{ window.location.href = '{{ url_for("student_dashboard") }}'; },2200); }
+
+/* ====== Finish button ====== */
+function updateFinishButton(){ const submittedCount = Object.values(answersMeta).filter(m=>m.submitted).length; const finishBtn = document.getElementById('finish-round-btn'); if(submittedCount === questions.length){ finishBtn.disabled = false; finishBtn.classList.remove('bg-gray-400','cursor-not-allowed'); finishBtn.classList.add('bg-green-600'); finishBtn.textContent = 'Finish Round & Go to Dashboard'; } else { finishBtn.disabled = false; finishBtn.classList.remove('bg-gray-400','cursor-not-allowed'); finishBtn.classList.add('bg-green-600'); finishBtn.textContent = `Submit Test (Unanswered: ${questions.length - submittedCount})`; } }
+
+function finishTest(){ const unanswered = questions.length - Object.values(answersMeta).filter(m=>m.submitted).length; const msg = unanswered>0 ? `You have ${unanswered} unanswered question(s). Are you sure you want to submit the test?` : 'All questions submitted. Submit test and go to dashboard?'; showConfirmModal('Submit Test', msg, ()=>{ // call backend optionally to mark complete
+  window.location.href = '{{ url_for("student_dashboard") }}'; }); }
+
+/* ====== Confirm modal helpers ====== */
+function showModal(title,message,duration=0, titleClass='text-red-600'){ const m=document.getElementById('custom-modal'); document.getElementById('modal-title').textContent = title; document.getElementById('modal-message').innerHTML = message; document.getElementById('modal-title').className = `text-2xl font-bold mb-4 ${titleClass}`; m.style.display='flex'; if(duration>0) setTimeout(()=> m.style.display='none', duration); }
+function showConfirmModal(title,message,yesCallback){ const m=document.getElementById('confirm-modal'); document.getElementById('confirm-title').textContent = title; document.getElementById('confirm-message').innerHTML = message; m.style.display='flex'; document.getElementById('confirm-yes').onclick = ()=>{ m.style.display='none'; yesCallback(); }; document.getElementById('confirm-no').onclick = ()=>{ m.style.display='none'; }; }
+
+/* ====== Init ====== */
+document.addEventListener('DOMContentLoaded', ()=>{
+  // refs & hooks
+  document.getElementById('start-test-btn').addEventListener('click', async ()=>{ document.getElementById('start-modal').style.display='none'; document.getElementById('main-content').classList.remove('blur-md','pointer-events-none'); await requestFullscreen(); await startCamera(); startTimer(); await fetchQuestions(); });
+  document.getElementById('prev-btn').addEventListener('click', ()=>{ currentIndex = (currentIndex-1+questions.length)%questions.length; renderQuestion(); highlightJump(); scrollToTop(); });
+  document.getElementById('next-btn').addEventListener('click', ()=>{ currentIndex = (currentIndex+1)%questions.length; renderQuestion(); highlightJump(); scrollToTop(); });
+  document.getElementById('submit-btn').addEventListener('click', submitAnswer);
+  document.getElementById('finish-round-btn').addEventListener('click', finishTest);
+
+  // prevent accidental unload
+  window.onbeforeunload = function(){ logViolation('PAGE_UNLOAD'); return 'Test in progress. Leaving will be logged.'; };
+});
+</script>
+{% endblock %}
+
 {% block content %}
-<div id="proctorWarning" class="hidden fixed inset-0 bg-red-600 text-white flex items-center justify-center z-50">
-    <div class="text-center">
-        <i class="fas fa-exclamation-triangle text-6xl mb-4"></i>
-        <h2 class="text-3xl font-bold mb-2">WARNING!</h2>
-        <p class="text-xl" id="warningText"></p>
+<div class="container-lg">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+    <div>
+      <h1 style="margin:0; font-size:26px; font-weight:800; color:#0f172a;">Round 2 — Non‑Technical Assessment</h1>
+      <div class="muted" style="margin-top:6px;">One question per page • 90 minutes</div>
     </div>
+    <div style="text-align:right;">
+      <div class="muted">Hello, {{ current_user.first_name }}</div>
+      <div class="muted">{{ current_user.institute }} • {{ current_user.department }}</div>
+    </div>
+  </div>
+
+  <!-- Proctor bar -->
+  <div class="proctor-bar">
+    <div class="proctor-left">
+      <div id="camera-holder" style="display:flex; gap:10px; align-items:center;">
+        <div style="display:flex; flex-direction:column; align-items:flex-start;">
+          <div style="font-weight:700; color:#0f172a;">Proctoring Active</div>
+          <div class="muted" style="font-size:13px;">Keep camera on & stay in fullscreen</div>
+        </div>
+      </div>
+      <div id="jump-bar" class="jump-bar" style="margin-left:18px;"></div>
+    </div>
+
+    <div class="proctor-right">
+      <div class="muted">Time Left</div>
+      <div class="timer-badge" id="timer-display">01:30:00</div>
+      <button class="btn btn-ghost" onclick="showModal('Instructions','Type your answer in the box and click Submit Answer. You can jump between questions using the boxes.')">Instructions</button>
+    </div>
+  </div>
+
+  <!-- Start modal -->
+  <div id="start-modal" class="modal-backdrop">
+    <div class="modal-card">
+      <h3 style="color:var(--primary); margin-bottom:8px; font-weight:800;">Start Non‑Technical Test</h3>
+      <p class="muted" style="margin-bottom:12px;">This round is proctored. Keep your camera on and remain in fullscreen. Clicking Start will begin the timer and enable the test.</p>
+      <button id="start-test-btn" class="btn btn-primary" style="width:100%;">Start Test</button>
+    </div>
+  </div>
+
+  <!-- Main content -->
+  <div id="main-content" class="blur-md pointer-events-none" style="margin-top:16px;">
+    <div class="question-card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <div>
+          <div class="q-title" id="q-title">Loading question...</div>
+          <div class="muted">Question <span id="question-progress">1</span> of <span id="total-questions">4</span></div>
+        </div>
+        <div style="width:120px; height:72px; border-radius:8px; overflow:hidden; border:1px solid #eef2ff; background:#f8fafc;" id="camera-preview">
+          <video id="cameraFeed" autoplay playsinline muted style="width:100%; height:100%; object-fit:cover;"></video>
+        </div>
+      </div>
+
+      <div id="q-desc" class="q-desc" style="min-height:160px; max-height:400px; overflow:auto; background:#fafbff; padding:12px; border-radius:8px; border:1px solid #f1f5f9;">Question content will appear here.</div>
+
+      <div style="margin-top:12px;">
+        <textarea id="answer-textarea" class="textarea" placeholder="Type your detailed answer here..."></textarea>
+      </div>
+
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px; gap:10px; flex-wrap:wrap;">
+        <div class="muted">Word count: <span id="word-count">0</span></div>
+        <div style="display:flex; gap:10px;"><button id="prev-btn" class="btn btn-ghost">Prev</button><button id="submit-btn" class="btn btn-primary">Submit Answer</button><button id="next-btn" class="btn btn-ghost">Next</button></div>
+      </div>
+    </div>
+
+    <div style="display:flex; justify-content:center; margin-top:18px;">
+      <button id="finish-round-btn" class="btn btn-primary bg-gray-400 cursor-not-allowed" disabled>Submit all questions to finish</button>
+    </div>
+
+  </div>
 </div>
 
-<div class="max-w-4xl mx-auto">
-    <div class="bg-white rounded-lg shadow-lg p-6 mb-4">
-        <h1 class="text-3xl font-bold">
-            <i class="fas fa-edit text-purple-600 mr-2"></i>Non-Technical Test
-        </h1>
-        <p class="text-gray-600 mt-2">Answer all 4 questions. AI will evaluate your responses.</p>
-    </div>
-    
-    <div class="bg-yellow-100 border-l-4 border-yellow-500 p-4 mb-4">
-        <p class="text-yellow-900">
-            <i class="fas fa-camera mr-2"></i>Proctoring active. Stay in fullscreen.
-        </p>
-    </div>
-    
-    <div id="cameraPreview" class="mb-4 bg-black rounded-lg overflow-hidden" style="height: 120px;">
-        <video id="videoElement" autoplay muted class="w-full h-full object-cover"></video>
-    </div>
-    
-    <div id="questionsContainer">
-    </div>
-    
-    <div class="text-center mt-6">
-        <a href="/student/dashboard" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-6 rounded-lg">
-            <i class="fas fa-arrow-left mr-2"></i>Back to Dashboard
-        </a>
-    </div>
+<!-- Confirm Modal -->
+<div id="confirm-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:300; align-items:center; justify-content:center;">
+  <div style="background:white; width:420px; padding:24px; border-radius:12px; text-align:center;">
+    <h3 id="confirm-title" style="font-size:20px; font-weight:800; color:#0f172a; margin-bottom:8px;"></h3>
+    <p id="confirm-message" style="color:#475569; margin-bottom:20px;"></p>
+    <div style="display:flex; gap:12px; justify-content:center;"><button id="confirm-yes" class="btn btn-primary" style="width:120px;">Yes</button><button id="confirm-no" class="btn btn-ghost" style="width:120px;">No</button></div>
+  </div>
 </div>
 
-<script src="/static/js/proctoring.js"></script>
-<script src="/static/js/non_technical.js"></script>
+<!-- Generic Modal -->
+<div id="custom-modal" style="display:none; position:fixed; inset:0; align-items:center; justify-content:center; background:rgba(2,6,23,0.45); z-index:200;">
+  <div style="background:white; padding:18px; border-radius:10px; width:420px; text-align:center;">
+    <h3 id="modal-title" class="text-2xl font-bold mb-4 text-red-600">Notice</h3>
+    <div id="modal-message" class="muted" style="margin-bottom:14px;"></div>
+    <button onclick="document.getElementById('custom-modal').style.display='none'" class="btn btn-primary">Acknowledge</button>
+  </div>
+</div>
+
 {% endblock %}

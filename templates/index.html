@@ -1,40 +1,202 @@
-{% extends "base.html" %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI-Powered Interview Evaluation Platform</title>
 
-{% block content %}
-<div class="min-h-screen flex items-center justify-center -mt-16">
-    <div class="text-center">
-        <div class="mb-8">
-            <i class="fas fa-brain text-blue-600 text-8xl mb-4"></i>
-            <h1 class="text-5xl font-bold text-gray-800 mb-4">AI Interview Evaluation System</h1>
-            <p class="text-xl text-gray-600 mb-8">Complete AI-powered interview platform with multi-round testing and proctoring</p>
-        </div>
-        
-        <div class="space-x-4">
-            <a href="{{ url_for('login') }}" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg text-lg transition">
-                <i class="fas fa-sign-in-alt mr-2"></i>Login
-            </a>
-            <a href="{{ url_for('register') }}" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-lg text-lg transition">
-                <i class="fas fa-user-plus mr-2"></i>Register
-            </a>
-        </div>
-        
-        <div class="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
-            <div class="bg-white p-6 rounded-lg shadow-md">
-                <i class="fas fa-clipboard-list text-blue-600 text-4xl mb-3"></i>
-                <h3 class="text-xl font-bold mb-2">Round 1: Aptitude</h3>
-                <p class="text-gray-600">AI-generated MCQ tests tailored to your department</p>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
+
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .glass-box {
+            backdrop-filter: blur(12px);
+            background: rgba(255, 255, 255, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.25);
+        }
+    </style>
+</head>
+
+<body class="bg-white">
+
+    <!-- HERO SECTION -->
+    <div class="min-h-screen bg-cover bg-center bg-no-repeat flex flex-col"
+         style="background-image: url('{{ url_for('static', filename='Images/image.png') }}');">
+
+        <!-- NAVBAR (FIXED) -->
+        <nav class="w-full absolute top-0 left-0 z-50">
+            <div class="w-full backdrop-blur-md bg-black/40 border-b border-white/10 shadow-lg">
+                <div class="container mx-auto px-6 py-4 flex justify-between items-center">
+
+                    <!-- Logo + Title -->
+                    <div class="flex items-center space-x-3">
+                        <img class="h-10 w-10 rounded-lg border border-white/50 shadow-md"
+                             src="{{ url_for('static', filename='Images/logo.jpg') }}" />
+
+                        <div>
+                            <h1 class="text-lg font-bold text-white drop-shadow-[0_2px_3px_rgba(0,0,0,0.9)]">
+                                Nutan Institutions
+                            </h1>
+                            <p class="text-xs text-white/90 drop-shadow-[0_2px_3px_rgba(0,0,0,0.7)]">
+                                AI Interview Evaluation System
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Nav Links -->
+                    <div class="flex items-center space-x-4">
+                        <a href="{{ url_for('register') }}"
+                           class="text-white hover:text-blue-300 font-medium transition drop-shadow">
+                           Get Started
+                        </a>
+
+                        <a href="{{ url_for('login') }}"
+                           class="text-white hover:text-blue-300 font-medium transition drop-shadow">
+                           Sign In
+                        </a>
+
+                        <a href="{{ url_for('login') }}"
+                           class="bg-white/90 text-blue-700 font-semibold py-2 px-4 rounded-lg shadow-md
+                                  hover:bg-white transition">
+                           Admin Login
+                        </a>
+                    </div>
+
+                </div>
             </div>
-            <div class="bg-white p-6 rounded-lg shadow-md">
-                <i class="fas fa-code text-green-600 text-4xl mb-3"></i>
-                <h3 class="text-xl font-bold mb-2">Round 2: Technical</h3>
-                <p class="text-gray-600">Coding challenges with real-time execution</p>
-            </div>
-            <div class="bg-white p-6 rounded-lg shadow-md">
-                <i class="fas fa-microphone text-purple-600 text-4xl mb-3"></i>
-                <h3 class="text-xl font-bold mb-2">Round 3: HR Interview</h3>
-                <p class="text-gray-600">Voice-based mock interview with AI evaluation</p>
+        </nav>
+
+        <!-- HERO CONTENT -->
+        <div class="flex-grow flex items-center justify-center bg-black/40 backdrop-blur-sm">
+            <div class="glass-box p-10 rounded-2xl max-w-3xl mx-auto text-center text-white shadow-xl">
+                <h1 class="text-5xl md:text-6xl font-extrabold mb-4">
+                    AI-Powered Interview Evaluation
+                </h1>
+
+                <p class="text-xl text-gray-200 mb-8">
+                    A complete assessment system for aptitude, coding, and technical interviews.
+                </p>
+
+                <div class="flex justify-center space-x-4">
+                    <a href="{{ url_for('register') }}"
+                       class="bg-blue-600 py-3 px-6 rounded-lg text-lg hover:bg-blue-700">
+                        Get Started <i class="fas fa-arrow-right ml-2"></i>
+                    </a>
+
+                    <a href="#features"
+                       class="bg-white/20 py-3 px-6 rounded-lg text-lg hover:bg-white/30">
+                        Learn More
+                    </a>
+                </div>
             </div>
         </div>
+
     </div>
-</div>
-{% endblock %}
+
+    <!-- FEATURES SECTION -->
+    <section id="features" class="py-20 bg-white">
+        <div class="container mx-auto px-6 max-w-6xl">
+
+            <h2 class="text-4xl font-bold text-center text-gray-900 mb-4">
+                Comprehensive Interview Assessment
+            </h2>
+            <p class="text-center text-gray-600 mb-12">
+                Evaluate aptitude, technical, and coding abilities with AI.
+            </p>
+
+            <div class="grid md:grid-cols-3 gap-10">
+
+                <!-- Card 1 -->
+                <div class="glass-box p-6 rounded-xl text-center shadow-md">
+                    <i class="fas fa-brain text-4xl text-blue-600 mb-3"></i>
+                    <h3 class="text-xl font-bold mb-2">Round 1: Aptitude Test</h3>
+                    <p class="text-gray-700 mb-4 text-sm">60 MCQs testing logic, reasoning, and problem-solving.</p>
+                    <ul class="text-left text-sm text-gray-800 space-y-2">
+                        <li><i class="fas fa-check text-blue-500 mr-2"></i> 60-minute timer</li>
+                        <li><i class="fas fa-check text-blue-500 mr-2"></i> Auto-scored</li>
+                        <li><i class="fas fa-check text-blue-500 mr-2"></i> Instant analytics</li>
+                    </ul>
+                </div>
+
+                <!-- Card 2 -->
+                <div class="glass-box p-6 rounded-xl text-center shadow-md">
+                    <i class="fas fa-code text-4xl text-blue-600 mb-3"></i>
+                    <h3 class="text-xl font-bold mb-2">Round 2/3: Technical</h3>
+                    <p class="text-gray-700 mb-4 text-sm">Coding and domain-specific assessments.</p>
+                    <ul class="text-left text-sm text-gray-800 space-y-2">
+                        <li><i class="fas fa-check text-blue-500 mr-2"></i> Real-time execution</li>
+                        <li><i class="fas fa-check text-blue-500 mr-2"></i> AI scoring</li>
+                        <li><i class="fas fa-check text-blue-500 mr-2"></i> Detailed feedback</li>
+                    </ul>
+                </div>
+
+                <!-- Card 3 -->
+                <div class="glass-box p-6 rounded-xl text-center shadow-md">
+                    <i class="fas fa-chart-line text-4xl text-blue-600 mb-3"></i>
+                    <h3 class="text-xl font-bold mb-2">Analytics</h3>
+                    <p class="text-gray-700 mb-4 text-sm">Smart insights into performance and growth areas.</p>
+                    <ul class="text-left text-sm text-gray-800 space-y-2">
+                        <li><i class="fas fa-check text-blue-500 mr-2"></i> Skill breakdown</li>
+                        <li><i class="fas fa-check text-blue-500 mr-2"></i> Predictive insights</li>
+                        <li><i class="fas fa-check text-blue-500 mr-2"></i> Improvements</li>
+                    </ul>
+                </div>
+
+            </div>
+        </div>
+    </section>
+
+    <!-- INSTITUTES SECTION -->
+    <section class="py-20 bg-gray-50">
+        <div class="container mx-auto px-6 max-w-4xl">
+
+            <h2 class="text-4xl font-bold text-center text-gray-900 mb-12">
+                Serving Excellence in Education
+            </h2>
+
+            <div class="grid md:grid-cols-2 gap-8">
+
+                <!-- NCER -->
+                <div class="bg-white p-8 rounded-2xl shadow-xl border border-gray-200 text-center">
+                    <h3 class="text-2xl font-bold text-gray-900 mb-2">NCER</h3>
+                    <p class="text-gray-600 text-sm mb-2">Nutan College of Engineering & Research</p>
+                    <p class="text-gray-700 text-sm">
+                        Premier engineering institution fostering innovation and technical excellence.
+                    </p>
+                </div>
+
+                <!-- NMIT -->
+                <div class="bg-white p-8 rounded-2xl shadow-xl border border-gray-200 text-center">
+                    <h3 class="text-2xl font-bold text-gray-900 mb-2">NMIT</h3>
+                    <p class="text-gray-600 text-sm mb-2">Nutan Maharashtra Institute of Technology</p>
+                    <p class="text-gray-700 text-sm">
+                        Leading technology institute dedicated to shaping future engineers.
+                    </p>
+                </div>
+
+            </div>
+        </div>
+    </section>
+
+    <!-- FOOTER -->
+    <footer class="bg-white py-10 border-t border-gray-200">
+        <div class="container mx-auto px-6 text-center text-gray-600">
+
+            <div class="flex justify-center items-center space-x-3 mb-4">
+                <img class="h-10 w-10 rounded-full border border-gray-300"
+                     src="{{ url_for('static', filename='Images/logo.jpg') }}">
+                <span class="text-lg font-bold text-gray-800">
+                    Nutan Institutions
+                </span>
+            </div>
+
+            <p class="text-sm text-gray-500">
+                © 2025 Nutan AI Interview Evaluation System. All rights reserved.
+            </p>
+        </div>
+    </footer>
+
+</body>
+</html>

@@ -1,87 +1,525 @@
 {% extends "base.html" %}
+{% block title %}Coding Test{% endblock %}
+{% block head %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.31.1/ace.js"></script>
+<style>
+:root{
+  --primary:#2563eb; --accent:#60a5fa; --danger:#ef4444; --muted:#6b7280; --card:#ffffff;
+}
+body { background: linear-gradient(180deg,#fbfdff 0%, #f8fafc 100%); }
+.container-lg { max-width:1100px; margin:0 auto; padding:26px; }
+.proctor-bar {
+  position: sticky; top:12px; z-index:60;
+  display:flex; justify-content:space-between; align-items:center; gap:12px;
+  background:var(--card); border:1px solid #e6eefc; padding:12px 16px; border-radius:12px;
+  box-shadow: 0 10px 30px rgba(2,6,23,0.06);
+  flex-wrap:wrap;
+}
+.proctor-left { display:flex; gap:16px; align-items:center; }
+.proctor-right { display:flex; gap:12px; align-items:center; }
+.timer-badge { font-weight:800; color:var(--danger); font-size:18px; background:#fff6f6; padding:8px 12px; border-radius:10px; border:1px solid #fee2e2; }
+.jump-bar { display:flex; gap:8px; padding:8px; overflow-x:auto; }
+.jump-bar::-webkit-scrollbar{ display:none; }
+.jump-btn { min-width:46px; height:46px; border-radius:10px; border:1px solid #e6eefc; background:#f8fafc; display:inline-flex; align-items:center; justify-content:center; font-weight:700; cursor:pointer; transition:transform .12s, box-shadow .12s; }
+.jump-btn:hover{ transform:translateY(-4px); box-shadow:0 8px 20px rgba(37,99,235,0.06); }
+.not-visited { background:#f8fafc; color:#374151; }
+.not-answered { background:#fff1f2; color:#b91c1c; border-color:#fbcaca; }
+.answered { background:#ecfdf5; color:#065f46; border-color:#bbf7d0; }
+.current-q { outline:3px solid rgba(37,99,235,0.12); transform:scale(1.03); }
+.question-card { background:var(--card); border-radius:12px; border:1px solid #e6eefc; padding:18px; margin-bottom:18px; box-shadow:0 8px 26px rgba(2,6,23,0.04); }
+.q-title { font-weight:800; color:#0f172a; margin-bottom:8px; font-size:18px; }
+.q-desc { color:#334155; margin-bottom:12px; }
+.editor-card { height:420px; border-radius:10px; overflow:hidden; border:1px solid #e6eefc; }
+#editor { height:100%; width:100%; }
+.btn { padding:10px 16px; border-radius:10px; font-weight:700; border:none; cursor:pointer; }
+.btn-primary { background:var(--primary); color:#fff; }
+.btn-ghost { background:#eef2ff; color:var(--primary); border:1px solid #dbeafe; }
+.btn-danger { background:var(--danger); color:#fff; }
+.muted { color:var(--muted); font-size:13px; }
+.center { text-align:center; }
+.camera-thumb { width:72px; height:48px; border-radius:8px; border:1px solid #e6eefc; overflow:hidden; background:#000; }
+.violation-badge { background:#fff6f6; color:var(--danger); padding:6px 10px; border-radius:8px; border:1px solid #fee2e2; font-weight:700; }
+@media (max-width: 980px) {
+  .proctor-left { flex:1 1 100%; }
+  .proctor-right { flex:1 1 100%; justify-content:flex-end; }
+  .editor-card { height:320px; }
+}
+</style>
 
-{% block extra_css %}
-<script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.23.4/ace.js"></script>
+<script>
+/* --- CONFIG --- */
+const TOTAL_QS = 4;
+const EXAM_SECONDS = 90 * 60;
+const ROUND_NAME = 'Coding';
+const PROCTOR_POLL_MS = 2000; // how often to check camera
+
+/* --- STATE --- */
+let questions = [];
+let currentIndex = 0;
+let submissions = {};
+let answersMeta = {};
+let timerInterval = null;
+let proctorInterval = null;
+let mediaStream = null;
+let faceDetector = null;
+let violationCount = 0;
+
+/* DOM refs */
+let editor, runBtn, submitBtn, finishBtn, jumpBar, qProgressEl, totalQEl, outputArea, errorArea, langSelect, timerEl, cameraFeed, proctorStatusEl, violationEl;
+
+function secondsToHms(sec){
+  const h = String(Math.floor(sec/3600)).padStart(2,'0');
+  const m = String(Math.floor((sec%3600)/60)).padStart(2,'0');
+  const s = String(sec%60).padStart(2,'0');
+  return `${h}:${m}:${s}`;
+}
+
+/* TIMER */
+function startTimer(){
+  const end = Date.now() + EXAM_SECONDS*1000;
+  timerInterval = setInterval(()=>{
+    let remain = Math.max(0, Math.floor((end - Date.now())/1000));
+    timerEl.textContent = secondsToHms(remain);
+    if(remain <= 0){ clearInterval(timerInterval); autoSubmitAll(); }
+  },1000);
+}
+
+/* FETCH QUESTIONS */
+async function fetchQuestions(){
+  try {
+    const r = await fetch('{{ url_for("get_coding_questions") }}');
+    const d = await r.json();
+    questions = d.questions || [];
+  } catch(e) {
+    console.error('Could not fetch questions', e);
+    questions = [];
+  }
+  for(let i=0;i<TOTAL_QS;i++){
+    let q = questions[i] || {id:`q${i+1}`, title:`Question ${i+1}`, description:'Question content not available.'};
+    answersMeta[q.id] = { submitted:false };
+    if(!questions[i]) questions[i] = q;
+  }
+  renderJumpButtons();
+  renderQuestion();
+}
+
+/* JUMP BUTTONS */
+function renderJumpButtons(){
+  jumpBar.innerHTML = '';
+  for(let i=0;i<TOTAL_QS;i++){
+    const b = document.createElement('button');
+    b.className = 'jump-btn not-answered';
+    b.id = `jump-${i+1}`;
+    b.textContent = i+1;
+    b.onclick = ()=>{ currentIndex = i; renderQuestion(); highlightJump(); };
+    jumpBar.appendChild(b);
+  }
+  highlightJump();
+}
+function highlightJump(){
+  for(let i=0;i<TOTAL_QS;i++){
+    const btn = document.getElementById(`jump-${i+1}`);
+    if(!btn) continue;
+    const q = questions[i];
+    const qid = q ? q.id : `q${i+1}`;
+    btn.className = 'jump-btn';
+    if(answersMeta[qid] && answersMeta[qid].submitted) btn.classList.add('answered');
+    else if(i === currentIndex) btn.classList.add('current-q');
+    else btn.classList.add('not-answered');
+  }
+}
+
+/* RENDER QUESTION */
+function renderQuestion(){
+  const q = questions[currentIndex];
+  document.getElementById('q-title').textContent = q.title || `Question ${currentIndex+1}`;
+  document.getElementById('q-desc').innerHTML = q.description || '';
+  qProgressEl.textContent = currentIndex+1;
+  totalQEl.textContent = TOTAL_QS;
+
+  const sub = submissions[q.id];
+  if(sub){
+    editor.setValue(sub.code || '',1);
+    langSelect.value = sub.language || 'python';
+    runBtn.disabled = true;
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Submitted';
+  } else {
+    editor.setValue(q.is_sql ? '-- SQL query here' : '# Write your code here',1);
+    langSelect.value = q.is_sql ? 'sql' : 'python';
+    updateEditorMode(langSelect.value);
+    runBtn.disabled = !!q.is_sql;
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Submit';
+  }
+  highlightJump();
+  updateFinishButton();
+  clearOutput();
+}
+
+/* EDITOR */
+function setupAce(){
+  editor = ace.edit("editor");
+  editor.setTheme("ace/theme/chrome");
+  editor.session.setMode("ace/mode/python");
+  editor.setOptions({ fontSize:"13pt", tabSize:4, useSoftTabs:true });
+}
+function updateEditorMode(lang){
+  let mode = 'python';
+  if(['c','cpp'].includes(lang)) mode='c_cpp';
+  if(lang==='java') mode='java';
+  if(lang==='sql') mode='sql';
+  editor.session.setMode(`ace/mode/${mode}`);
+}
+
+/* OUTPUT */
+function clearOutput(){ outputArea.textContent = 'Run your code to see output here.'; errorArea.textContent=''; errorArea.style.display='none'; }
+
+/* RUN */
+async function runCode(){
+  const q = questions[currentIndex];
+  if(!q || q.is_sql) return;
+  runBtn.textContent = 'Running...'; runBtn.disabled = true;
+  outputArea.textContent = 'Executing...';
+  try {
+    const r = await fetch('{{ url_for("run_code") }}',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question_id:q.id,code:editor.getValue(),language:langSelect.value})});
+    const d = await r.json();
+    if(d.success){ outputArea.textContent = d.output || 'No output.'; }
+    else { outputArea.textContent = d.error || 'Execution failed.'; }
+  } catch(e){ console.error('run error', e); outputArea.textContent = 'Network error during run.'; }
+  runBtn.textContent='Run'; runBtn.disabled=false;
+}
+
+/* SUBMIT */
+async function submitCode(){
+  const q = questions[currentIndex];
+  if(!q) return;
+  const code = editor.getValue();
+  const lang = langSelect.value;
+
+  const doSubmit = async()=>{
+    submitBtn.textContent='Submitting...'; submitBtn.disabled=true;
+    try {
+      const r = await fetch('{{ url_for("submit_code") }}',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question_id:q.id,code,language:lang,output:outputArea.textContent,error: (errorArea.style.display !== 'none') ? errorArea.textContent : ''})});
+      const d = await r.json();
+      if(r.ok && d.success){
+        submissions[q.id] = { code, language: lang, output: outputArea.textContent };
+        answersMeta[q.id].submitted = true;
+        showModal('Submitted', d.message || 'Submission successful.', 2000, 'text-green-600');
+        runBtn.disabled = true; submitBtn.disabled = true; submitBtn.textContent = 'Submitted';
+        highlightJump(); updateFinishButton();
+      } else {
+        showModal('Submission Failed', d.message || 'Failed to submit.', 0);
+        submitBtn.textContent='Submit'; submitBtn.disabled=false;
+      }
+    } catch(e){ console.error('submit error', e); showModal('Network Error', 'Failed to submit code.', 0); submitBtn.textContent='Submit'; submitBtn.disabled=false; }
+  };
+
+  if(!code.trim()){
+    showConfirmModal('Blank Submission','You did not write any code. Do you still want to submit blank for this question?', doSubmit);
+    return;
+  }
+  doSubmit();
+}
+
+/* FINAL SUBMIT TEST BUTTON */
+function finalSubmit(){
+  const submittedCount = Object.values(answersMeta).filter(x=>x.submitted).length;
+  const unanswered = TOTAL_QS - submittedCount;
+  if(unanswered > 0){
+    showConfirmModal('Submit Test?', `You have ${unanswered} unanswered question(s). Are you sure you want to submit the test?`, ()=>{
+      // after final submit redirect to dashboard (no forced lock to HR round)
+      window.location.href = '{{ url_for("admin_dashboard") }}';
+    });
+  } else {
+    showConfirmModal('Submit Test?', 'All questions answered. Submit test and go to dashboard?', ()=>{
+      window.location.href = '{{ url_for("admin_dashboard") }}';
+    });
+  }
+}
+
+/* TIME UP */
+async function autoSubmitAll(){
+  showModal('Time Up', 'Time is over. Submitting available answers and proceeding to dashboard...', 2500, 'text-red-600');
+  // try to auto-submit unanswered as blank
+  for(let i=0;i<TOTAL_QS;i++){
+    const q = questions[i];
+    if(!q) continue;
+    if(answersMeta[q.id] && answersMeta[q.id].submitted) continue;
+    try{
+      await fetch('{{ url_for("submit_code") }}',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question_id:q.id,code:'',language:'python',output:'Auto-submitted on timeout',error:''})});
+      answersMeta[q.id].submitted = true;
+    }catch(e){ console.error('auto submit error', e); }
+  }
+  setTimeout(()=>{ window.location.href = '{{ url_for("admin_dashboard") }}'; }, 1500);
+}
+
+/* MODALS */
+function showModal(title, message, duration=0, titleClass='text-red-600'){
+  const modal = document.getElementById('custom-modal');
+  document.getElementById('modal-title').textContent = title;
+  document.getElementById('modal-message').innerHTML = message;
+  document.getElementById('modal-title').className = `text-2xl font-bold mb-4 ${titleClass}`;
+  modal.style.display = 'flex';
+  if(duration>0) setTimeout(()=> modal.style.display='none', duration);
+}
+
+function showConfirmModal(title,msg,yes){
+  const m=document.getElementById('confirm-modal');
+  document.getElementById('confirm-title').textContent=title;
+  document.getElementById('confirm-message').innerHTML=msg;
+  m.style.display='flex';
+  document.getElementById('confirm-yes').onclick = ()=>{ m.style.display='none'; yes(); };
+  document.getElementById('confirm-no').onclick = ()=>{ m.style.display='none'; };
+}
+
+/* FINISH BUTTON STATE */
+function updateFinishButton(){
+  const submittedCount = Object.values(answersMeta).filter(m=>m.submitted).length;
+  finishBtn.disabled = false;
+  finishBtn.classList.remove('btn-ghost');
+  finishBtn.classList.add('btn-primary');
+  if(submittedCount === TOTAL_QS) finishBtn.textContent = 'Finish Round & Go to Dashboard';
+  else finishBtn.textContent = `Finish Anyway (Unanswered: ${TOTAL_QS - submittedCount})`;
+}
+
+/* NAV HELPERS */
+function goNext(){ currentIndex = (currentIndex+1) % TOTAL_QS; renderQuestion(); scrollToTop(); }
+function goPrev(){ currentIndex = (currentIndex-1+TOTAL_QS) % TOTAL_QS; renderQuestion(); scrollToTop(); }
+function scrollToTop(){ window.scrollTo({ top: document.querySelector('.proctor-bar').offsetTop - 12, behavior:'smooth' }); }
+
+/* PROCTORING */
+async function startCamera(){
+  try{
+    cameraFeed = document.getElementById('cameraFeed');
+    const s = await navigator.mediaDevices.getUserMedia({video:{width:640,height:480}, audio:false});
+    mediaStream = s;
+    cameraFeed.srcObject = s;
+    cameraFeed.play().catch(()=>{});
+
+    // Setup FaceDetector if available (native API in modern Chrome)
+    if('FaceDetector' in window){
+      faceDetector = new FaceDetector({fastMode:true});
+    } else {
+      console.warn('Native FaceDetector not available in this browser. Face-count checks will be limited.');
+    }
+
+    // start periodic checks
+    proctorInterval = setInterval(proctorCheck, PROCTOR_POLL_MS);
+  }catch(e){ console.warn('camera denied', e); showModal('Camera','Camera access required for proctoring. Please enable camera.',0,'text-red-600'); }
+}
+
+async function stopProctoring(){
+  if(proctorInterval) clearInterval(proctorInterval);
+  if(mediaStream){ mediaStream.getTracks().forEach(t=>t.stop()); mediaStream = null; }
+}
+
+async function proctorCheck(){
+  try{
+    // camera disconnected?
+    if(!mediaStream || mediaStream.getVideoTracks().length === 0 || mediaStream.getVideoTracks()[0].readyState !== 'live'){
+      reportViolation('CAMERA_OFF');
+      updateProctorUI('Camera off or disconnected');
+      return;
+    }
+
+    // detect faces using native FaceDetector
+    if(faceDetector){
+      const videoEl = document.getElementById('cameraFeed');
+      const bitmap = await createImageBitmap(videoEl);
+      const detections = await faceDetector.detect(bitmap);
+      bitmap.close();
+      if(detections.length === 0){ reportViolation('NO_FACE'); updateProctorUI('No face detected'); }
+      else if(detections.length > 1){ reportViolation('MULTIPLE_FACES'); updateProctorUI('Multiple faces detected'); }
+      else { updateProctorUI('Proctoring OK'); }
+    } else {
+      // Fallback: simple heuristic - check if video is playing by reading currentTime
+      const v = document.getElementById('cameraFeed');
+      if(v && v.readyState < 2){ reportViolation('NO_VIDEO'); updateProctorUI('No camera feed'); }
+      else updateProctorUI('Proctoring (limited)');
+    }
+
+    // visibility check (already handled in visibilitychange listener too)
+    if(document.hidden) reportViolation('TAB_SWITCH');
+  }catch(e){ console.error('proctor check error', e); }
+}
+
+function updateProctorUI(msg){
+  proctorStatusEl.textContent = msg;
+  violationEl.textContent = `Violations: ${violationCount}`;
+}
+
+function reportViolation(type){
+  violationCount++;
+  updateProctorUI(type);
+  try{ fetch('{{ url_for("log_violation") }}',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type,round:ROUND_NAME,timestamp:new Date().toISOString(),violation_count:violationCount})}); }catch(e){ console.warn('log error', e); }
+  // show small modal for user awareness (non-blocking)
+  showModal('Violation', `Detected: ${type}`, 1600, 'text-red-600');
+}
+
+/* INIT */
+document.addEventListener('DOMContentLoaded', ()=>{
+  jumpBar = document.getElementById('jump-bar');
+  outputArea = document.getElementById('output-area');
+  errorArea = document.getElementById('error-area');
+  langSelect = document.getElementById('language-select');
+  runBtn = document.getElementById('run-code-btn');
+  submitBtn = document.getElementById('submit-code-btn');
+  finishBtn = document.getElementById('finish-round-btn');
+  qProgressEl = document.getElementById('question-progress');
+  totalQEl = document.getElementById('total-questions');
+  timerEl = document.getElementById('timer-display');
+  proctorStatusEl = document.getElementById('proctor-status');
+  violationEl = document.getElementById('violation-count');
+
+  setupAce();
+  langSelect.onchange = ()=> updateEditorMode(langSelect.value);
+  runBtn.onclick = runCode;
+  submitBtn.onclick = submitCode;
+  finishBtn.onclick = finalSubmit;
+  document.getElementById('prev-btn').onclick = goPrev;
+  document.getElementById('next-btn').onclick = goNext;
+
+  document.getElementById('start-test-btn').onclick = async ()=>{
+    document.getElementById('start-modal').style.display='none';
+    document.getElementById('main-content').classList.remove('blur-md','pointer-events-none');
+    // try to request fullscreen (optional) but don't block users who deny it
+    try{ await requestFullscreen(); }catch(e){}
+    // start camera + proctoring
+    try{ await startCamera(); }catch(e){}
+    startTimer(); fetchQuestions();
+  };
+
+  // proctoring hooks
+  document.addEventListener('contextmenu', e=>{ e.preventDefault(); try{ fetch('{{ url_for("log_violation") }}',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'RIGHT_CLICK',round:ROUND_NAME})}); }catch{}; showModal('Violation','Right click disabled',1200); });
+  document.addEventListener('visibilitychange', ()=>{ if(document.hidden){ try{ fetch('{{ url_for("log_violation") }}',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'TAB_SWITCH',round:ROUND_NAME})}); }catch{}; showModal('Violation','Do not switch tabs',1200); } });
+
+  // stop proctoring when leaving the page
+  window.addEventListener('beforeunload', ()=>{ stopProctoring(); });
+});
+
+/* Minimal fullscreen helper */
+async function requestFullscreen(){ if(!document.fullscreenElement) try{ await document.documentElement.requestFullscreen(); }catch(e){ console.warn('fullscreen failed', e); } }
+</script>
 {% endblock %}
 
 {% block content %}
-<div id="proctorWarning" class="hidden fixed inset-0 bg-red-600 text-white flex items-center justify-center z-50">
-    <div class="text-center">
-        <i class="fas fa-exclamation-triangle text-6xl mb-4"></i>
-        <h2 class="text-3xl font-bold mb-2">WARNING!</h2>
-        <p class="text-xl" id="warningText"></p>
+<div class="container-lg">
+  <div style="display:flex; justify-content:space-between; margin-bottom:12px;">
+    <div>
+      <h1 style="margin:0; font-size:26px; font-weight:800;">Round 2 — Coding Test</h1>
+      <div class="muted">4 Questions • 90 minutes</div>
     </div>
+    <div style="text-align:right;" class="muted">Hello, {{ current_user.first_name }}</div>
+  </div>
+
+  <div class="proctor-bar">
+    <div class="proctor-left">
+      <div><div style="font-weight:700;">Proctoring Active</div><div class="muted">Camera ON Required</div></div>
+      <div id="jump-bar" class="jump-bar"></div>
+    </div>
+
+    <div class="proctor-right">
+      <div style="display:flex; align-items:center; gap:12px;">
+        <div class="muted">Time Left</div>
+        <div class="timer-badge" id="timer-display">01:30:00</div>
+      </div>
+      <div style="display:flex; align-items:center; gap:10px; margin-left:12px;">
+        <div class="camera-thumb"><video id="cameraFeed" autoplay muted playsinline style="width:100%; height:100%; object-fit:cover;"></video></div>
+        <div style="display:flex; flex-direction:column; align-items:flex-end;">
+          <div id="proctor-status" class="muted">Proctoring: Init</div>
+          <div id="violation-count" class="violation-badge">Violations: 0</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="start-modal" style="position:fixed; inset:0; background:rgba(0,0,0,0.45); display:flex; justify-content:center; align-items:center; z-index:90;">
+    <div style="background:white; padding:20px; border-radius:10px; width:420px; text-align:center;">
+      <h3 style="font-size:20px; font-weight:800; color:#2563eb;">Start Coding Test</h3>
+      <p class="muted">This round is proctored. Keep your camera on. Fullscreen is optional. Do not switch tabs.</p>
+      <button id="start-test-btn" class="btn btn-primary" style="width:100%; margin-top:14px;">Start Test</button>
+    </div>
+  </div>
+
+  <div id="main-content" class="blur-md pointer-events-none" style="margin-top:16px;">
+    <div style="display:flex; gap:18px; flex-wrap:wrap;">
+
+      <div style="flex:1 1 48%;">
+        <div class="question-card">
+          <div style="display:flex; justify-content:space-between;">
+            <div>
+              <div class="q-title" id="q-title">Loading...</div>
+              <div class="muted">Question <span id="question-progress">1</span> of <span id="total-questions">4</span></div>
+            </div>
+          </div>
+          <div id="q-desc" class="q-desc" style="min-height:200px; max-height:480px; overflow:auto;">Loading...</div>
+        </div>
+      </div>
+
+      <div style="flex:1 1 48%; display:flex; flex-direction:column; gap:14px;">
+        <div class="editor-card">
+          <div style="padding:10px; border-bottom:1px solid #eef2ff; display:flex; justify-content:space-between; align-items:center;">
+            <div class="muted">Language</div>
+            <select id="language-select" style="padding:6px 8px; border-radius:8px;">
+              <option value="python">Python</option>
+              <option value="c">C</option>
+              <option value="cpp">C++</option>
+              <option value="java">Java</option>
+              <option value="sql">SQL</option>
+            </select>
+          </div>
+          <div id="editor"></div>
+        </div>
+
+        <div class="question-card">
+          <div style="display:flex; gap:10px; margin-bottom:10px;">
+            <button id="run-code-btn" class="btn btn-primary" style="flex:1;">Run</button>
+            <button id="submit-code-btn" class="btn btn-danger" style="flex:1;">Submit</button>
+          </div>
+
+          <h4 style="margin:0; font-weight:700;">Output</h4>
+          <pre id="output-area" class="muted" style="background:#f8fafc; padding:10px; border-radius:8px; min-height:80px; max-height:200px; overflow:auto;">Run your code to see output here.</pre>
+
+          <pre id="error-area" style="display:none; background:#fff1f2; padding:10px; border-radius:8px; color:var(--danger);"></pre>
+        </div>
+      </div>
+
+    </div>
+
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:20px; gap:12px;">
+      <div style="display:flex; gap:10px;">
+        <button id="prev-btn" class="btn btn-ghost">Prev</button>
+        <button id="next-btn" class="btn btn-ghost">Next</button>
+      </div>
+
+      <div style="display:flex; gap:10px; align-items:center;">
+        <button id="finish-round-btn" class="btn btn-primary" style="padding-left:28px; padding-right:28px;">Submit Test</button>
+      </div>
+    </div>
+  </div>
 </div>
 
-<div class="max-w-7xl mx-auto">
-    <div class="bg-white rounded-lg shadow-lg p-6 mb-4">
-        <h1 class="text-3xl font-bold">
-            <i class="fas fa-code text-green-600 mr-2"></i>Coding Test
-        </h1>
-        <p class="text-gray-600 mt-2">Complete all 4 coding questions. One must be SQL.</p>
+<!-- Confirm Modal -->
+<div id="confirm-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); align-items:center; justify-content:center; z-index:300;">
+  <div style="background:white; width:360px; padding:20px; border-radius:10px; text-align:center;">
+    <h3 id="confirm-title" style="font-size:18px; font-weight:800;"></h3>
+    <p id="confirm-message" class="muted" style="margin-top:8px;"></p>
+
+    <div style="display:flex; gap:14px; margin-top:20px; justify-content:center;">
+      <button id="confirm-yes" class="btn btn-primary" style="width:120px;">Yes</button>
+      <button id="confirm-no" class="btn btn-ghost" style="width:120px;">No</button>
     </div>
-    
-    <div class="bg-yellow-100 border-l-4 border-yellow-500 p-4 mb-4">
-        <p class="text-yellow-900">
-            <i class="fas fa-camera mr-2"></i>Proctoring active. Camera on, fullscreen mode required.
-        </p>
-    </div>
-    
-    <div id="cameraPreview" class="mb-4 bg-black rounded-lg overflow-hidden" style="height: 120px;">
-        <video id="videoElement" autoplay muted class="w-full h-full object-cover"></video>
-    </div>
-    
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-        <div id="questionTabs" class="md:col-span-1 space-y-2">
-        </div>
-    </div>
-    
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div class="bg-white rounded-lg shadow-lg p-6">
-            <h3 class="text-xl font-bold mb-4" id="questionTitle">Select a question</h3>
-            <div id="questionDescription" class="text-gray-700 mb-4 whitespace-pre-line"></div>
-            
-            <div class="mb-4">
-                <label class="block font-bold mb-2">Language</label>
-                <select id="languageSelect" class="px-4 py-2 border rounded-lg">
-                    <option value="python">Python</option>
-                    <option value="c">C</option>
-                    <option value="cpp">C++</option>
-                    <option value="java">Java</option>
-                    <option value="sql">SQL</option>
-                </select>
-            </div>
-            
-            <div class="mb-4">
-                <label class="block font-bold mb-2">Code Editor</label>
-                <div id="editor" style="height: 400px; border: 1px solid #ddd;"></div>
-            </div>
-            
-            <div class="flex space-x-2">
-                <button id="runBtn" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">
-                    <i class="fas fa-play mr-2"></i>Run Code
-                </button>
-                <button id="submitCodeBtn" class="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg">
-                    <i class="fas fa-check mr-2"></i>Submit
-                </button>
-            </div>
-        </div>
-        
-        <div class="bg-white rounded-lg shadow-lg p-6">
-            <h3 class="text-xl font-bold mb-4">Output</h3>
-            <div id="output" class="bg-gray-100 p-4 rounded-lg font-mono text-sm min-h-[200px] whitespace-pre-wrap"></div>
-            
-            <div id="errorOutput" class="hidden bg-red-100 p-4 rounded-lg mt-4 text-red-700 font-mono text-sm"></div>
-        </div>
-    </div>
-    
-    <div class="mt-4 text-center">
-        <a href="/student/dashboard" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-6 rounded-lg">
-            <i class="fas fa-arrow-left mr-2"></i>Back to Dashboard
-        </a>
-    </div>
+  </div>
 </div>
 
-<script src="/static/js/proctoring.js"></script>
-<script src="/static/js/coding.js"></script>
+<!-- Small generic modal -->
+<div id="custom-modal" style="display:none; position:fixed; inset:0; align-items:center; justify-content:center; background:rgba(2,6,23,0.45); z-index:200;">
+  <div style="background:white; padding:18px; border-radius:10px; width:420px; text-align:center;">
+    <h3 id="modal-title" class="text-2xl font-bold mb-4 text-red-600"></h3>
+    <div id="modal-message" class="muted" style="margin-bottom:14px;"></div>
+    <button onclick="document.getElementById('custom-modal').style.display='none'" class="btn btn-primary">Acknowledge</button>
+  </div>
+</div>
+
 {% endblock %}

@@ -1,71 +1,544 @@
 {% extends "base.html" %}
 
+{% block title %}Admin Dashboard{% endblock %}
+{% block nav_title %}Admin Dashboard{% endblock %}
+
+{% block head %}
+{{ super() }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% endblock %}
+
 {% block content %}
-<div class="max-w-7xl mx-auto">
-    <h1 class="text-4xl font-bold mb-8 text-center">
-        <i class="fas fa-user-shield text-blue-600 mr-3"></i>Admin Dashboard
-    </h1>
-    
-    <div class="bg-white rounded-lg shadow-lg p-6 mb-8">
-        <div class="flex justify-between items-center mb-6">
-            <h2 class="text-2xl font-bold">Filter Students</h2>
-            <select id="departmentFilter" class="px-4 py-2 border rounded-lg">
-                <option value="">All Departments</option>
-                {% for dept in departments %}
-                <option value="{{ dept }}">{{ dept }}</option>
-                {% endfor %}
-            </select>
+
+<div class="min-h-screen bg-cover bg-center bg-no-repeat flex items-start justify-center py-10"
+     style="background-image: url('{{ url_for('static', filename='Images/background.jpg') }}');">
+
+    <div class="w-full max-w-7xl bg-white/20 backdrop-blur-xl shadow-2xl border border-white/30 rounded-2xl p-8">
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+            <div class="bg-white/60 backdrop-blur-lg p-6 rounded-2xl shadow-md border border-white/40">
+                <div class="flex justify-between items-center mb-1">
+                    <h3 class="text-sm font-medium text-gray-700 uppercase">Total Students</h3>
+                    <i class="fas fa-users text-gray-400"></i>
+                </div>
+                <p id="kpi-total-students" class="text-4xl font-extrabold text-gray-900">...</p>
+            </div>
+
+            <div class="bg-white/60 backdrop-blur-lg p-6 rounded-2xl shadow-md border border-white/40">
+                <div class="flex justify-between items-center mb-1">
+                    <h3 class="text-sm font-medium text-gray-700 uppercase">Active Interviews</h3>
+                    <i class="fas fa-spinner text-gray-400"></i>
+                </div>
+                <p id="kpi-active-interviews" class="text-4xl font-extrabold text-gray-900">...</p>
+            </div>
+
+            <div class="bg-white/60 backdrop-blur-lg p-6 rounded-2xl shadow-md border border-white/40">
+                <div class="flex justify-between items-center mb-1">
+                    <h3 class="text-sm font-medium text-gray-700 uppercase">Completed</h3>
+                    <i class="fas fa-check-circle text-gray-400"></i>
+                </div>
+                <p id="kpi-completed" class="text-4xl font-extrabold text-gray-900">...</p>
+            </div>
+
+            <div class="bg-white/60 backdrop-blur-lg p-6 rounded-2xl shadow-md border border-white/40">
+                <div class="flex justify-between items-center mb-1">
+                    <h3 class="text-sm font-medium text-gray-700 uppercase">Average Score</h3>
+                    <i class="fas fa-chart-line text-gray-400"></i>
+                </div>
+                <p id="kpi-average-score" class="text-4xl font-extrabold text-gray-900">...%</p>
+            </div>
         </div>
-        
-        <div id="studentsTable" class="overflow-x-auto">
-            <table class="w-full">
-                <thead class="bg-gray-100">
-                    <tr>
-                        <th class="px-4 py-3 text-left">Name</th>
-                        <th class="px-4 py-3 text-left">Email</th>
-                        <th class="px-4 py-3 text-left">Department</th>
-                        <th class="px-4 py-3 text-center">Aptitude</th>
-                        <th class="px-4 py-3 text-center">Round 2</th>
-                        <th class="px-4 py-3 text-center">Interview</th>
-                        <th class="px-4 py-3 text-center">Violations</th>
-                        <th class="px-4 py-3 text-center">Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="studentsList">
-                    <tr>
-                        <td colspan="8" class="text-center py-4">Loading...</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-    </div>
-    
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-        <div class="bg-white rounded-lg shadow-lg p-6">
-            <h3 class="text-xl font-bold mb-4">Department-wise Performance</h3>
-            <canvas id="departmentChart"></canvas>
-        </div>
-        <div class="bg-white rounded-lg shadow-lg p-6">
-            <h3 class="text-xl font-bold mb-4">Overall Statistics</h3>
-            <div id="statsDisplay"></div>
+
+        <div class="bg-white/40 backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/40">
+            <div class="border-b border-gray-300/40 mb-6">
+                <nav class="-mb-px flex space-x-8">
+                    <button id="analytics-tab"
+                            class="border-blue-600 text-blue-600 py-4 px-1 border-b-2 font-medium text-sm">
+                        Analytics
+                    </button>
+                    <button id="students-tab"
+                            class="border-transparent text-gray-700 hover:text-gray-900 py-4 px-1 border-b-2 font-medium text-sm">
+                        Students
+                    </button>
+                    <button id="settings-tab"
+                            class="border-transparent text-gray-500 opacity-50 cursor-not-allowed py-4 px-1 border-b-2 font-medium text-sm">
+                        Settings (Soon)
+                    </button>
+                </nav>
+            </div>
+
+            <div id="analytics-view">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+                    <div class="bg-white/70 backdrop-blur-lg p-6 rounded-2xl shadow-md border border-white/40">
+                        <h3 class="text-lg font-semibold text-gray-800 mb-2">Pass Rate</h3>
+                        <p class="text-4xl font-extrabold text-green-600">68%</p>
+                    </div>
+
+                    <div class="bg-white/70 backdrop-blur-lg p-6 rounded-2xl shadow-md border border-white/40">
+                        <h3 class="text-lg font-semibold text-gray-800 mb-2">Fail Rate</h3>
+                        <p class="text-4xl font-extrabold text-red-600">32%</p>
+                    </div>
+
+                    <div class="bg-white/70 backdrop-blur-lg p-6 rounded-2xl shadow-md border border-white/40">
+                        <h3 class="text-lg font-semibold text-gray-800 mb-4">Department Performance</h3>
+                        <div class="w-full h-64 relative">
+                            <canvas id="chart-dept-performance"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="bg-white/70 backdrop-blur-lg p-6 rounded-2xl shadow-md border border-white/40">
+                        <h3 class="text-lg font-semibold text-gray-800 mb-4">Performance Trend</h3>
+                        <div class="w-full h-64 relative">
+                            <canvas id="chart-performance-trend"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="bg-white/70 backdrop-blur-lg p-6 rounded-2xl shadow-md border border-white/40">
+                        <h3 class="text-lg font-semibold text-gray-800 mb-4">Enrollment Distribution</h3>
+                        <div class="w-full h-64 relative">
+                            <canvas id="chart-enrollment-dist"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="bg-white/70 backdrop-blur-lg p-6 rounded-2xl shadow-md border border-white/40">
+                        <h3 class="text-lg font-semibold text-gray-800 mb-4">Score Distribution</h3>
+                        <div class="w-full h-64 relative">
+                            <canvas id="chart-score-dist"></canvas>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <div id="students-view" class="hidden">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-semibold text-gray-800">All Student Records</h3>
+                    <div class="flex items-center space-x-3">
+                        <label for="student-dept-filter" class="text-gray-700 text-sm">Filter:</label>
+                        <select id="student-dept-filter"
+                                class="bg-white/60 backdrop-blur-lg border border-white/40 rounded-lg py-1 px-2 text-sm">
+                            <option value="">All Departments</option>
+                            {% for dept in departments %}
+                                <option value="{{ dept }}">{{ dept }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200 backdrop-blur-lg bg-white/70 rounded-xl">
+                        <thead class="bg-white/60">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Name</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">PRN</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Institute</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Department</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium">Apti</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium">R2</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium">HR</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium">Flags</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="students-table-body" class="bg-white/80 divide-y divide-gray-200">
+                            </tbody>
+                    </table>
+                </div>
+
+            </div>
         </div>
     </div>
 </div>
 
-<div id="studentModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-    <div class="bg-white rounded-lg shadow-2xl max-w-4xl w-full max-h-screen overflow-y-auto m-4">
-        <div class="p-6">
-            <div class="flex justify-between items-center mb-4">
-                <h2 class="text-2xl font-bold">Student Details</h2>
-                <button onclick="closeModal()" class="text-gray-500 hover:text-gray-700">
-                    <i class="fas fa-times text-2xl"></i>
+<div id="student-details-modal"
+     class="fixed inset-0 bg-black/40 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+
+    <div class="bg-white/95 backdrop-blur-md w-full max-w-4xl max-h-[90vh] overflow-y-auto p-6 rounded-xl shadow-xl">
+        <div class="flex justify-between items-center border-b pb-3 mb-4">
+            <h3 id="modal-title" class="text-2xl font-bold">Student Full Report</h3>
+            <div class="flex items-center gap-4">
+                <a id="modal-export-btn" href="#"
+                   class="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-sm font-medium">
+                    <i class="fas fa-file-pdf mr-1"></i> Export PDF
+                </a>
+                <button id="close-modal-btn" class="text-gray-600 hover:text-gray-800 text-xl">
+                    <i class="fas fa-times"></i>
                 </button>
             </div>
-            <div id="studentDetails">Loading...</div>
         </div>
+
+        <div id="detail-content" class="text-sm">
+            </div>
     </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="/static/js/admin.js"></script>
+
+<script>
+    // This will hold our chart objects so we can destroy them before redrawing
+    let chartInstances = {};
+
+    // Get the list of technical departments from the Config object passed by Flask
+    const technicalDepts = {{ Config.TECHNICAL_DEPARTMENTS|tojson }};
+
+    /**
+     * 1. KPI LOADER
+     * Fetches data from /api/admin/stats and populates the top cards.
+     */
+    async function loadKPIs() {
+        try {
+            const res = await fetch("/api/admin/stats");
+            if (!res.ok) throw new Error('Failed to fetch stats');
+            const data = await res.json();
+
+            document.getElementById("kpi-total-students").textContent = data.total_students;
+            document.getElementById("kpi-active-interviews").textContent = data.active_interviews;
+            document.getElementById("kpi-completed").textContent = data.completed;
+            document.getElementById("kpi-average-score").textContent = data.average_score + "%";
+        } catch (e) {
+            console.error("Failed to load KPIs:", e);
+            document.getElementById("kpi-total-students").textContent = "Error";
+            document.getElementById("kpi-active-interviews").textContent = "Error";
+            document.getElementById("kpi-completed").textContent = "Error";
+            document.getElementById("kpi-average-score").textContent = "Error";
+        }
+    }
+
+    /**
+     * 2. STUDENT TABLE LOADER
+     * Fetches data from /api/admin/students and builds the table rows.
+     */
+    async function loadStudents() {
+        try {
+            const deptFilter = document.getElementById("student-dept-filter").value;
+            const url = deptFilter ? `/api/admin/students?department=${encodeURIComponent(deptFilter)}` : "/api/admin/students";
+            
+            const res = await fetch(url); 
+            if (!res.ok) throw new Error('Failed to fetch students');
+            
+            const { students } = await res.json(); 
+            const tbody = document.getElementById("students-table-body");
+            if (!tbody) return;
+            
+            tbody.innerHTML = ""; // Clear existing rows
+
+            if (students.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="9" class="text-center p-4 text-gray-500">No students found for this filter.</td></tr>`;
+                return;
+            }
+
+            students.forEach(s => {
+                const flagIcon = s.flagged ? `<span title="${s.violations} Violations">🚩</span>` : '';
+                tbody.innerHTML += `
+                    <tr class="hover:bg-gray-50/50">
+                        <td class="px-6 py-3 font-medium text-gray-900">${s.name}</td>
+                        <td class="px-6 py-3 text-gray-700">${s.prn}</td>
+                        <td class="px-6 py-3 text-gray-700">${s.institute}</td>
+                        <td class="px-6 py-3 text-gray-700">${s.department}</td>
+                        <td class="px-6 py-3 font-semibold">${s.aptitude_score}</td>
+                        <td class="px-6 py-3 font-semibold">${s.round2_score}</td>
+                        <td class="px-6 py-3 font-semibold">${s.interview_score}</td>
+                        <td class="px-6 py-3 text-center">${s.violations} ${flagIcon}</td>
+                        <td class="px-6 py-3">
+                            <button onclick="openStudentModal(${s.id})" class="bg-blue-600 text-white px-3 py-1 rounded text-xs font-medium hover:bg-blue-700">
+                                View Report
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+        } catch (e) {
+            console.error("Failed to load students:", e);
+            document.getElementById("students-table-body").innerHTML = `<tr><td colspan="9" class="text-center p-4 text-red-500">Failed to load student data.</td></tr>`;
+        }
+    }
+
+    /**
+     * 3. CHARTS LOADER
+     * Fetches data from /api/admin/charts and draws all 4 graphs.
+     */
+    async function loadCharts() {
+        try {
+            const res = await fetch("/api/admin/charts");
+            if (!res.ok) {
+                throw new Error('Failed to fetch chart data from /api/admin/charts');
+            }
+            
+            const charts = await res.json();
+
+            // Destroy old charts if they exist
+            Object.values(chartInstances).forEach(chart => chart.destroy());
+
+            // --- 1. Department Performance (Bar Chart) ---
+            const barCtx = document.getElementById('chart-dept-performance')?.getContext('2d');
+            if (barCtx) {
+                chartInstances.deptPerformance = new Chart(barCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: Object.keys(charts.dept_performance),
+                        datasets: [{
+                            label: 'Avg. Aptitude Score',
+                            data: Object.values(charts.dept_performance),
+                            backgroundColor: 'rgba(59, 130, 246, 0.7)',
+                            borderColor: 'rgba(59, 130, 246, 1)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false, // <-- This is crucial
+                        scales: { 
+                            y: { 
+                                beginAtZero: true, 
+                                max: 60, // Max score for aptitude
+                                title: { display: true, text: 'Avg. Score' }
+                            } 
+                        },
+                        plugins: { 
+                            legend: { display: false },
+                            title: { display: false } 
+                        }
+                    }
+                });
+            }
+            
+            // --- 2. Performance Trend (Line Chart) ---
+            const lineCtx = document.getElementById('chart-performance-trend')?.getContext('2d');
+            if (lineCtx) {
+                chartInstances.perfTrend = new Chart(lineCtx, {
+                    type: 'line',
+                    data: {
+                        labels: charts.performance_trend.labels, // e.g., ['Week 1', 'Week 2']
+                        datasets: [{
+                            label: 'Avg. Score Trend',
+                            data: charts.performance_trend.data, // e.g., [65, 72]
+                            fill: true,
+                            backgroundColor: 'rgba(22, 163, 74, 0.1)',
+                            borderColor: 'rgba(22, 163, 74, 1)',
+                            tension: 0.3
+                        }]
+                    },
+                    options: { 
+                        responsive: true, 
+                        maintainAspectRatio: false, // <-- This is crucial
+                        plugins: { legend: { display: false } } 
+                    }
+                });
+            }
+
+            // --- 3. Enrollment Distribution (Doughnut Chart) ---
+            const enrollCtx = document.getElementById('chart-enrollment-dist')?.getContext('2d');
+            if (enrollCtx) {
+                chartInstances.enrollDist = new Chart(enrollCtx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: Object.keys(charts.enrollment_dist),
+                        datasets: [{
+                            label: 'Enrollment',
+                            data: Object.values(charts.enrollment_dist),
+                            backgroundColor: ['#3b82f6', '#16a34a', '#ef4444', '#eab308', '#6366f1', '#f97316'],
+                        }]
+                    },
+                    options: { 
+                        responsive: true, 
+                        maintainAspectRatio: false, // <-- This is crucial
+                        plugins: { 
+                            legend: { position: 'right' } 
+                        } 
+                    }
+                });
+            }
+
+            // --- 4. Score Distribution (Pie Chart) ---
+            const pieCtx = document.getElementById('chart-score-dist')?.getContext('2d');
+            if (pieCtx) {
+                chartInstances.scoreDist = new Chart(pieCtx, {
+                    type: 'pie',
+                    data: {
+                        labels: charts.score_dist.labels, // e.g., ['Fail', 'Average', 'Good']
+                        datasets: [{
+                            label: 'Score Distribution',
+                            data: charts.score_dist.data,
+                            backgroundColor: ['#ef4444', '#f97316', '#22c55e', '#3b82f6'],
+                        }]
+                    },
+                    options: { 
+                        responsive: true, 
+                        maintainAspectRatio: false, // <-- This is crucial
+                        plugins: { 
+                            legend: { position: 'right' } 
+                        } 
+                    }
+                });
+            }
+
+        } catch(e) {
+            console.error("Failed to load charts:", e);
+        }
+    }
+
+    /**
+     * 4. MODAL HANDLERS
+     * Controls opening, closing, and populating the student detail modal.
+     */
+    const modal = document.getElementById('student-details-modal');
+    
+    async function openStudentModal(studentId) {
+        const contentDiv = document.getElementById('detail-content');
+        const title = document.getElementById('modal-title');
+        const exportBtn = document.getElementById('modal-export-btn');
+        
+        contentDiv.innerHTML = '<p class="text-center text-gray-500">Loading full report...</p>';
+        title.textContent = "Loading...";
+        exportBtn.href = "#"; // Disable link until it's loaded
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+
+        try {
+            const res = await fetch(`/api/admin/student/${studentId}`);
+            if (!res.ok) throw new Error('Student data not found');
+            const data = await res.json();
+            
+            title.textContent = `Report for ${data.student.name}`;
+            exportBtn.href = `/api/admin/export/${studentId}`; // Set correct PDF link
+            contentDiv.innerHTML = buildModalHTML(data); // Populate content
+        } catch(e) {
+            console.error("Failed to load student details:", e);
+            contentDiv.innerHTML = `<p class="text-center text-red-500">Error loading report. ${e.message}</p>`;
+        }
+    }
+
+    function closeModal() {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+        document.getElementById('detail-content').innerHTML = ""; // Clear content
+    }
+
+    function buildModalHTML(data) {
+        // --- Aptitude Section ---
+        const aptiHTML = data.aptitude.completed
+            ? `<div class="p-4 bg-blue-50 rounded-lg">
+                 <p><strong>Score:</strong> ${data.aptitude.score} / ${data.aptitude.total}</p>
+                 <p><strong>Time Taken:</strong> ${Math.floor(data.aptitude.time_taken_sec / 60)}m ${data.aptitude.time_taken_sec % 60}s</p>
+               </div>`
+            : '<p class="text-gray-500">Not Completed</p>';
+        
+        // --- Coding Section ---
+        const codingHTML = data.coding.length > 0
+            ? data.coding.map(c => `
+                <div class="mt-2 p-4 bg-gray-100 rounded-lg">
+                    <h5 class="font-semibold text-gray-800">${c.question_title} (${c.language})</h5>
+                    <div class="mt-2">
+                        <label class="font-medium text-xs">Code:</label>
+                        <pre class="bg-gray-800 text-white p-2 rounded text-xs leading-4 overflow-auto">${c.code || 'No code submitted.'}</pre>
+                    </div>
+                    ${c.output ? `<div class="mt-1"><label class="font-medium text-xs">Output:</label><pre class="bg-gray-200 text-black p-2 rounded text-xs leading-4">${c.output}</pre></div>` : ''}
+                    ${c.error ? `<div class="mt-1"><label class="font-medium text-xs">Error:</label><pre class="bg-red-100 text-red-700 p-2 rounded text-xs leading-4">${c.error}</pre></div>` : ''}
+                </div>`).join('')
+            : '<p class="text-gray-500">No submissions</p>';
+        
+        // --- Non-Technical Section ---
+        const nonTechHTML = data.non_technical.length > 0
+            ? data.non_technical.map(nt => `
+                <div class="mt-2 p-4 bg-gray-100 rounded-lg">
+                    <h5 class="font-semibold text-gray-800">${nt.question}</h5>
+                    <p class="text-xs my-1"><strong>Score: ${nt.ai_score}/100</strong></p>
+                    <p class="text-xs bg-green-100 p-2 rounded"><strong>Feedback:</strong> ${nt.ai_feedback}</p>
+                    <p class="text-xs bg-gray-200 mt-2 p-2 rounded"><strong>Answer:</strong> ${nt.answer}</p>
+                </div>`).join('')
+            : '<p class="text-gray-500">No submissions</p>';
+
+        // --- HR Interview Section ---
+        const hrHTML = data.interview.completed
+            ? `<div class="p-4 bg-green-50 rounded-lg">
+                 <p><strong>Overall Score:</strong> ${data.interview.overall_score} / 100</p>
+                 <div class="grid grid-cols-2 gap-2 mt-2 text-xs">
+                     <p>Communication: ${data.interview.communication_score}/100</p>
+                     <p>Confidence: ${data.interview.confidence_score}/100</p>
+                     <p>Clarity: ${data.interview.clarity_score}/100</p>
+                     <p>Relevance: ${data.interview.relevance_score}/100</p>
+                 </div>
+                 <h5 class="font-semibold mt-3">Feedback:</h5>
+                 <p class="text-xs bg-gray-100 p-2 rounded">${data.interview.feedback}</p>
+                 <h5 class="font-semibold mt-3">Transcript:</h5>
+                 <p class="text-xs bg-gray-100 p-2 rounded max-h-40 overflow-y-auto">${data.interview.transcript.replace(/\n/g, '<br>')}</p>
+               </div>`
+            : '<p class="text-gray-500">Not Completed</p>';
+        
+        // Check the STUDENT'S department (from 'data') against the list from 'Config'
+        const isTechnical = technicalDepts.includes(data.student.department);
+        const round2HTML = isTechnical ? codingHTML : nonTechHTML;
+        const round2Title = isTechnical ? "Technical Coding Round" : "Non-Technical Round";
+
+        // --- Main HTML structure ---
+        return `
+            <div class="space-y-4">
+                <div>
+                    <h4 class="text-lg font-bold text-blue-700">1. Aptitude Test</h4>
+                    ${aptiHTML}
+                </div>
+                <div>
+                    <h4 class="text-lg font-bold text-blue-700">2. ${round2Title}</h4>
+                    ${round2HTML}
+                </div>
+                <div>
+                    <h4 class="text-lg font-bold text-blue-700">3. HR Interview</h4>
+                    ${hrHTML}
+                </div>
+            </div>
+        `;
+    }
+
+    /**
+     * 5. TAB SWITCHER
+     * Controls the navigation between "Analytics" and "Students" tabs.
+     */
+    function setupTabs() {
+        const analyticsTab = document.getElementById('analytics-tab');
+        const studentsTab = document.getElementById('students-tab');
+        const analyticsView = document.getElementById('analytics-view');
+        const studentsView = document.getElementById('students-view');
+        
+        const activeClass = 'border-blue-600 text-blue-600';
+        const inactiveClass = 'border-transparent text-gray-700 hover:text-gray-900';
+        
+        analyticsTab.addEventListener('click', () => {
+            analyticsTab.className = analyticsTab.className.replace(inactiveClass, activeClass).trim();
+            studentsTab.className = studentsTab.className.replace(activeClass, inactiveClass).trim();
+            analyticsView.classList.remove('hidden');
+            studentsView.classList.add('hidden');
+        });
+        
+        studentsTab.addEventListener('click', () => {
+            studentsTab.className = studentsTab.className.replace(inactiveClass, activeClass).trim();
+            analyticsTab.className = analyticsTab.className.replace(activeClass, inactiveClass).trim();
+            studentsView.classList.remove('hidden');
+            analyticsView.classList.add('hidden');
+        });
+    }
+
+    /**
+     * 6. INITIALIZATION
+     * Runs all setup functions when the page is loaded.
+     */
+    document.addEventListener("DOMContentLoaded", () => {
+        // Load all data on page load
+        loadKPIs();
+        loadStudents();
+        loadCharts();
+        
+        // Set up event listeners for filters and modals
+        setupTabs();
+        document.getElementById('student-dept-filter').addEventListener('change', loadStudents);
+        document.getElementById('close-modal-btn').addEventListener('click', closeModal);
+        
+        // Close modal on background click
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                closeModal();
+            }
+        });
+    });
+
+</script>
 {% endblock %}

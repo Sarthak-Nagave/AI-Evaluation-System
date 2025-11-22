@@ -1,63 +1,214 @@
 {% extends "base.html" %}
 
+{% block title %}Login{% endblock %}
+
 {% block content %}
-<div class="min-h-screen flex items-center justify-center -mt-16">
-    <div class="bg-white p-8 rounded-lg shadow-lg w-full max-w-md">
-        <h2 class="text-3xl font-bold text-center mb-6">
-            <i class="fas fa-sign-in-alt text-blue-600 mr-2"></i>Login
-        </h2>
-        
-        <form id="loginForm">
-            <div class="mb-4">
-                <label class="block text-gray-700 font-bold mb-2">Email</label>
-                <input type="email" id="email" required class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:border-blue-500">
+
+<!-- FULLSCREEN BACKGROUND -->
+<div class="min-h-screen bg-cover bg-center bg-no-repeat flex flex-col"
+     style="background-image: url('{{ url_for('static', filename='Images/background.jpg') }}');">
+
+    <!-- PREMIUM GLASS NAVBAR (same as index and register) -->
+    <nav class="w-full absolute top-0 left-0 z-50">
+        <div class="w-full backdrop-blur-md bg-black/40 border-b border-white/10 shadow-lg">
+            <div class="container mx-auto px-6 py-4 flex justify-between items-center">
+
+                <!-- LOGO + TITLE -->
+                <div class="flex items-center space-x-3">
+                    <img class="h-10 w-10 rounded-lg border border-white/40 shadow-md"
+                         src="{{ url_for('static', filename='Images/logo.jpg') }}" />
+
+                    <div>
+                        <h1 class="text-lg font-bold text-white drop-shadow">
+                            AI Interview System
+                        </h1>
+                        <p class="text-xs text-white/80 drop-shadow">
+                            Interview Evaluation System
+                        </p>
+                    </div>
+                </div>
+
+                <a href="{{ url_for('register') }}"
+                   class="bg-white/90 text-blue-700 font-semibold py-2 px-5 rounded-lg shadow-md hover:bg-white transition text-sm">
+                    Register
+                </a>
             </div>
-            
-            <div class="mb-6">
-                <label class="block text-gray-700 font-bold mb-2">Password</label>
-                <input type="password" id="password" required class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:border-blue-500">
+        </div>
+    </nav>
+
+    <!-- LOGIN CARD -->
+    <div class="flex-grow flex items-center justify-center px-4 pt-20">
+
+        <div class="w-full max-w-lg p-8 rounded-2xl bg-white/20 backdrop-blur-xl border border-white/30 shadow-2xl">
+
+            <!-- TABS -->
+            <div class="flex border-b border-white/40 mb-6">
+                <button id="student-tab"
+                    class="flex-1 py-3 text-center font-semibold text-white border-b-2 border-blue-300">
+                    Student Login
+                </button>
+
+                <button id="admin-tab"
+                    class="flex-1 py-3 text-center font-semibold text-white/60 hover:text-white transition">
+                    Admin Login
+                </button>
             </div>
-            
-            <div id="errorMessage" class="hidden mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded"></div>
-            
-            <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg transition">
-                Login
-            </button>
-        </form>
-        
-        <p class="text-center mt-4 text-gray-600">
-            Don't have an account? <a href="{{ url_for('register') }}" class="text-blue-600 hover:underline">Register here</a>
-        </p>
+
+            <!-- MESSAGE AREA -->
+            <div id="message-area" class="mb-4 hidden"></div>
+
+            <!-- STUDENT LOGIN FORM -->
+            <form id="student-login-form" class="space-y-5">
+
+                <h2 class="text-3xl font-bold text-white mb-2">Student Login</h2>
+                <p class="text-white/80 mb-6">Access your technical interview portal.</p>
+
+                <div>
+                    <label class="text-white text-sm block mb-1">Email</label>
+                    <input type="email" id="email"
+                           class="w-full px-4 py-3 rounded-xl bg-white/70 focus:bg-white text-gray-900 shadow outline-none"
+                           placeholder="student@ncer.com" required>
+                </div>
+
+                <div>
+                    <label class="text-white text-sm block mb-1">Password</label>
+                    <input type="password" id="password"
+                           class="w-full px-4 py-3 rounded-xl bg-white/70 focus:bg-white text-gray-900 shadow outline-none"
+                           placeholder="********" required>
+                </div>
+
+                <button type="submit"
+                        class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl shadow-lg transition">
+                    <span id="login-text">Login</span>
+                    <i id="loading-spinner" class="fas fa-spinner fa-spin ml-2 hidden"></i>
+                </button>
+
+            </form>
+
+            <!-- ADMIN LOGIN -->
+            <form id="admin-login-form" class="space-y-5 hidden">
+
+                <h2 class="text-3xl font-bold text-white mb-2">Admin Login</h2>
+                <p class="text-white/80 mb-6">Access the administrator dashboard.</p>
+
+                <div>
+                    <label class="text-white text-sm block mb-1">Admin Email</label>
+                    <input type="email" id="admin-email"
+                           class="w-full px-4 py-3 rounded-xl bg-white/70 focus:bg-white text-gray-900 shadow outline-none"
+                           placeholder="admin@nutan.com" required>
+                </div>
+
+                <div>
+                    <label class="text-white text-sm block mb-1">Password</label>
+                    <input type="password" id="admin-password"
+                           class="w-full px-4 py-3 rounded-xl bg-white/70 focus:bg-white text-gray-900 shadow outline-none"
+                           placeholder="********" required>
+                </div>
+
+                <button type="submit"
+                        class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl shadow-lg transition">
+                    <span id="admin-login-text">Login as Admin</span>
+                    <i id="admin-loading-spinner" class="fas fa-spinner fa-spin ml-2 hidden"></i>
+                </button>
+
+            </form>
+
+            <!-- REGISTER LINK -->
+            <p class="text-center text-white/90 text-sm mt-6">
+                Don't have an account?
+                <a href="{{ url_for('register') }}" class="text-blue-300 font-semibold hover:text-blue-400">Register Here</a>
+            </p>
+
+        </div>
     </div>
 </div>
 
+<!-- SCRIPT -->
 <script>
-document.getElementById('loginForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    
-    const email = document.getElementById('email').value;
-    const password = document.getElementById('password').value;
-    const errorDiv = document.getElementById('errorMessage');
-    
-    try {
-        const response = await fetch('/login', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ email, password })
-        });
-        
-        const data = await response.json();
-        
-        if (data.success) {
-            window.location.href = data.redirect;
+document.addEventListener('DOMContentLoaded', () => {
+
+    const studentTab = document.getElementById("student-tab");
+    const adminTab = document.getElementById("admin-tab");
+    const studentForm = document.getElementById("student-login-form");
+    const adminForm = document.getElementById("admin-login-form");
+    const messageArea = document.getElementById("message-area");
+
+    // TAB SWITCHING
+    studentTab.addEventListener("click", () => {
+        studentForm.classList.remove("hidden");
+        adminForm.classList.add("hidden");
+        studentTab.classList.add("border-blue-300", "text-white");
+        adminTab.classList.remove("border-blue-300");
+        adminTab.classList.add("text-white/60");
+    });
+
+    adminTab.addEventListener("click", () => {
+        adminForm.classList.remove("hidden");
+        studentForm.classList.add("hidden");
+        adminTab.classList.add("border-blue-300", "text-white");
+        studentTab.classList.remove("border-blue-300");
+        studentTab.classList.add("text-white/60");
+    });
+
+    // LOGIN LOGIC
+    const handleLogin = async (e, type) => {
+        e.preventDefault();
+
+        let email, password, textEl, spinnerEl;
+
+        if (type === "student") {
+            email = document.getElementById("email").value;
+            password = document.getElementById("password").value;
+            textEl = document.getElementById("login-text");
+            spinnerEl = document.getElementById("loading-spinner");
         } else {
-            errorDiv.textContent = data.message;
-            errorDiv.classList.remove('hidden');
+            email = document.getElementById("admin-email").value;
+            password = document.getElementById("admin-password").value;
+            textEl = document.getElementById("admin-login-text");
+            spinnerEl = document.getElementById("admin-loading-spinner");
         }
-    } catch (error) {
-        errorDiv.textContent = 'An error occurred. Please try again.';
-        errorDiv.classList.remove('hidden');
-    }
+
+        textEl.classList.add("hidden");
+        spinnerEl.classList.remove("hidden");
+        messageArea.classList.add("hidden");
+
+        try {
+            const response = await fetch("{{ url_for('login') }}", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email, password })
+            });
+
+            const data = await response.json();
+
+            if (response.ok && data.success) {
+                messageArea.innerHTML =
+                    `<div class='alert-success'>Login successful! Redirecting...</div>`;
+                messageArea.classList.remove("hidden");
+
+                setTimeout(() => window.location.href = data.redirect, 1000);
+
+            } else {
+                messageArea.innerHTML =
+                    `<div class='alert-error'>${data.message || "Invalid credentials"}</div>`;
+                messageArea.classList.remove("hidden");
+            }
+        } catch {
+            messageArea.innerHTML = `<div class='alert-error'>Network error. Try again.</div>`;
+            messageArea.classList.remove("hidden");
+        }
+
+        textEl.classList.remove("hidden");
+        spinnerEl.classList.add("hidden");
+    };
+
+    document.getElementById("student-login-form")
+        .addEventListener("submit", (e) => handleLogin(e, "student"));
+
+    document.getElementById("admin-login-form")
+        .addEventListener("submit", (e) => handleLogin(e, "admin"));
+
 });
 </script>
+
 {% endblock %}

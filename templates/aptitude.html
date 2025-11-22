@@ -1,58 +1,440 @@
 {% extends "base.html" %}
 
+{% block title %}Aptitude Test{% endblock %}
+
+{% block head %}
+<style>
+:root{
+  --primary:#2563eb; --accent:#60a5fa; --success:#10b981; --danger:#ef4444; --muted:#6b7280;
+  --card:#ffffff;
+}
+
+/* Page background */
+body { background: linear-gradient(180deg,#fbfdff 0%, #f8fafc 100%); }
+
+/* Container */
+.container-lg { max-width:1100px; margin:0 auto; padding:28px; }
+
+/* Topbar: uses two rows for robust layout */
+.topbar {
+  position: sticky; top:12px; z-index:60;
+  background: var(--card); border:1px solid #e6eefc; border-radius:12px;
+  box-shadow:0 8px 30px rgba(2,6,23,0.06); padding:14px; display:flex; gap:12px; flex-direction:column;
+}
+.topbar-row { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+.status-block { display:flex; gap:18px; align-items:center; flex-wrap:wrap; }
+.status-item { font-weight:600; color:var(--muted); font-size:14px; }
+
+/* Timer / progress */
+.timer { color:var(--danger); font-weight:700; font-size:16px; }
+.progress-mini { width:200px; height:8px; background:#eef2ff; border-radius:999px; overflow:hidden; }
+.progress-fill { height:100%; width:0%; background: linear-gradient(90deg,var(--primary),var(--accent)); transition:width .25s ease; }
+
+/* Navigator row */
+.topbar-nav-row { width:100%; }
+.qnav { display:flex; gap:8px; padding:8px; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; border-radius:10px; background:#fbfdff; border:1px solid #eef2ff; }
+.qnav::-webkit-scrollbar{ display:none; }
+
+/* q-number button */
+.qnum { min-width:44px; height:44px; border-radius:10px; border:1px solid #e6eefc; background:#f8fafc; display:inline-flex; align-items:center; justify-content:center; font-weight:700; color:#374151; cursor:pointer; transition:transform .12s, box-shadow .12s; }
+.qnum:hover{ transform:translateY(-4px); box-shadow:0 8px 20px rgba(37,99,235,0.06); }
+
+/* states */
+.q-not-visited { background:#f8fafc; color:#374151; }
+.q-not-answered { background:#fff1f2; color:#b91c1c; border-color:#fbcaca; }
+.q-answered { background:#ecfdf5; color:#065f46; border-color:#bbf7d0; }
+.q-current { outline:3px solid rgba(37,99,235,0.12); transform:scale(1.03); box-shadow:0 12px 30px rgba(37,99,235,0.06); }
+
+/* question card */
+.question-card { background:var(--card); border-radius:12px; border:1px solid #e6eefc; padding:18px; margin-bottom:18px; box-shadow:0 8px 26px rgba(2,6,23,0.04); }
+.question-title { font-weight:800; color:#0f172a; margin-bottom:8px; font-size:18px; }
+.question-text { color:#334155; margin-bottom:12px; }
+
+/* option row & coco radio */
+.option-row { display:flex; align-items:center; gap:12px; padding:12px; border-radius:10px; border:1px solid #eef2ff; transition:background .12s, border-color .12s; cursor:pointer; }
+.option-row:hover{ background:#f8fbff; border-color:#dbeafe; }
+.option-row.selected{ background:#eaf4ff; border-color:#93c5fd; box-shadow:0 8px 20px rgba(59,130,246,0.06); }
+
+/* cocubes circle */
+.coco { position:relative; width:18px; height:18px; border-radius:50%; border:2px solid var(--primary); display:inline-block; flex:0 0 18px; }
+.coco::after{ content:""; position:absolute; left:50%; top:50%; width:0; height:0; background:var(--primary); border-radius:50%; transform:translate(-50%,-50%); transition:width .12s, height .12s; }
+input.real-radio{ display:none !important; }
+input.real-radio:checked + .coco::after{ width:10px; height:10px; }
+
+/* option text */
+.opt-text { color:#0f172a; font-weight:600; font-size:15px; }
+
+/* submit area */
+.submit-wrap{ display:flex; justify-content:center; margin-top:16px; }
+.btn{ padding:10px 18px; border-radius:10px; font-weight:700; cursor:pointer; border:none; }
+.btn-primary{ background:var(--primary); color:white; box-shadow:0 10px 30px rgba(37,99,235,0.12); }
+.btn-danger{ background:var(--danger); color:white; }
+
+/* small helpers */
+.muted{ color:var(--muted); font-size:13px; }
+.center{text-align:center; }
+
+/* responsive */
+@media (max-width:900px){
+  .qnum{ min-width:40px; height:40px; font-size:13px; }
+  .progress-mini{ width:140px; }
+  .topbar{ padding:12px; }
+}
+</style>
+
+<script>
+/* ======= Global constants & state ======= */
+const QUESTION_COUNT = {{ question_count }};
+const ROUND_NAME = 'Aptitude';
+let questions = [], questionOrder = [], answers = {};
+let startTime = null, timerInterval = null;
+
+/* DOM refs */
+let testContainer, qnavContainer, timerEl, progressFill, progressText, submitTopBtn, submitBottomBtn, loadingMsg, camVideo;
+
+/* Format time mm:ss */
+const formatTime = s => { const m = Math.floor(s/60).toString().padStart(2,'0'); const sec = (s%60).toString().padStart(2,'0'); return `${m}:${sec}`; };
+
+/* ======= Modals ======= */
+function showConfirmUnanswered(remaining){
+  const modal = document.getElementById('confirm-modal');
+  document.getElementById('confirm-title').textContent = 'Unanswered Questions';
+  document.getElementById('confirm-body').innerHTML = `You have <strong>${remaining}</strong> unanswered questions. Are you sure you want to submit?`;
+  modal.style.display = 'flex';
+  return new Promise(resolve => {
+    const yes = document.getElementById('confirm-yes'), no = document.getElementById('confirm-no');
+    const clean = () => { yes.onclick = null; no.onclick = null; modal.style.display='none'; };
+    yes.onclick = () => { clean(); resolve(true); };
+    no.onclick = () => { clean(); resolve(false); };
+  });
+}
+function showInfo(title, html, auto=2000){
+  const modal = document.getElementById('info-modal');
+  document.getElementById('info-title').textContent = title;
+  document.getElementById('info-body').innerHTML = html;
+  modal.style.display = 'flex';
+  if (auto) setTimeout(()=> modal.style.display='none', auto);
+}
+
+/* ======= Proctoring ======= */
+async function logViolation(type, details = {}) {
+  try {
+    await fetch('{{ url_for("log_violation") }}', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ type, round: ROUND_NAME, details })
+    });
+  } catch(e){ console.error('violation log', e); }
+}
+document.addEventListener('contextmenu', e => { e.preventDefault(); logViolation('RIGHT_CLICK'); showInfo('Violation','Right click disabled',1200); });
+document.addEventListener('keydown', e => {
+  if (e.key === 'F12' || ((e.ctrlKey || e.metaKey) && e.shiftKey && ['I','J','C'].includes(e.key.toUpperCase()))) {
+    e.preventDefault(); logViolation('DEVTOOLS'); showInfo('Violation','Devtools disabled',1200);
+  }
+});
+document.addEventListener('visibilitychange', () => { if (document.hidden) { logViolation('TAB_SWITCH'); showInfo('Violation','Do not switch tabs',1200); } });
+
+/* start camera */
+async function startCamera(){
+  camVideo = document.getElementById('cameraFeed');
+  if (!camVideo) return;
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+    camVideo.srcObject = stream;
+  } catch(e){ console.warn('camera denied', e); logViolation('CAMERA_DENIED'); }
+}
+
+/* request fullscreen */
+async function requestFullScreen(){ if (!document.fullscreenElement) { try { await document.documentElement.requestFullscreen(); } catch(e){ console.warn('fullscreen denied', e); } } }
+
+/* ======= Timer & progress ======= */
+function startTimer(){
+  startTime = Date.now();
+  timerInterval = setInterval(()=> {
+    const elapsed = Math.floor((Date.now() - startTime)/1000);
+    timerEl.textContent = formatTime(elapsed);
+  },1000);
+}
+function updateProgressUI(){
+  const answered = Object.keys(answers).length;
+  const perc = Math.round((answered/QUESTION_COUNT)*100);
+  progressFill.style.width = `${perc}%`;
+  progressText.textContent = `${answered} / ${QUESTION_COUNT}`;
+  updateNavigatorStates();
+}
+
+/* ======= Navigator render & state ======= */
+function renderNavigator(){
+  qnavContainer.innerHTML = '';
+  for(let i=1;i<=QUESTION_COUNT;i++){
+    const btn = document.createElement('button');
+    btn.id = `nav-${i}`; btn.className = 'qnum q-not-visited'; btn.textContent = i;
+    btn.onclick = () => jumpToQuestion(i);
+    qnavContainer.appendChild(btn);
+  }
+  updateNavigatorStates();
+}
+function updateNavigatorStates(){
+  for(let i=1;i<=QUESTION_COUNT;i++){
+    const btn = document.getElementById(`nav-${i}`);
+    if(!btn) continue;
+    btn.classList.remove('q-not-visited','q-not-answered','q-answered','q-current');
+    const q = questions[i-1];
+    const qid = q ? q.id : null;
+    // current highlight if visible with class
+    const current = document.querySelector('.question-card.current');
+    if (current && current.id === `q-${i}`) btn.classList.add('q-current');
+    if (!qid) { btn.classList.add('q-not-visited'); continue; }
+    if (answers[qid]) btn.classList.add('q-answered');
+    else {
+      const visited = !!document.getElementById(`q-${i}`);
+      btn.classList.add(visited ? 'q-not-answered' : 'q-not-visited');
+    }
+  }
+}
+
+/* jump to question & mark current */
+function jumpToQuestion(n){
+  const el = document.getElementById(`q-${n}`);
+  if(!el) return;
+  const top = el.getBoundingClientRect().top + window.scrollY - 120;
+  window.scrollTo({ top, behavior:'smooth' });
+  document.querySelectorAll('.question-card').forEach(c => c.classList.remove('current'));
+  el.classList.add('current');
+  setTimeout(()=> updateNavigatorStates(), 300);
+}
+
+/* ======= Render questions (from backend JSON) ======= */
+function renderQuestions(){
+  testContainer.innerHTML = '';
+  questions.forEach((q, idx) => {
+    const qNum = idx+1;
+    const card = document.createElement('div'); card.className = 'question-card'; card.id = `q-${qNum}`;
+    if (idx===0) card.classList.add('current');
+
+    const title = document.createElement('div'); title.className='question-title'; title.innerHTML = `Q${qNum}. ${q.question}`;
+    const text = document.createElement('div'); text.className='question-text'; text.innerHTML = q.explain ? q.explain : '';
+
+    const opts = document.createElement('div'); opts.className='options-list';
+    Object.entries(q.options).forEach(([key,val])=>{
+      const row = document.createElement('label'); row.className='option-row';
+      // mark selected
+      if (answers[q.id] && answers[q.id] === key) row.classList.add('selected');
+
+      const input = document.createElement('input'); input.type='radio'; input.name=`q-${q.id}`; input.className='real-radio';
+      input.dataset.qid = q.id; input.value = key; if(answers[q.id] && answers[q.id]===key) input.checked = true;
+
+      const coco = document.createElement('span'); coco.className='coco';
+      const optText = document.createElement('span'); optText.className='opt-text'; optText.innerHTML = `(${key}) ${val}`;
+
+      input.addEventListener('change', e => {
+        answers[q.id] = e.target.value;
+        updateProgressUI();
+        renderQuestions();
+      });
+
+      // clicking row triggers radio
+      row.appendChild(input); row.appendChild(coco); row.appendChild(optText);
+      row.addEventListener('click', ()=> {
+        input.checked = true;
+        input.dispatchEvent(new Event('change', { bubbles:true }));
+      });
+
+      opts.appendChild(row);
+    });
+
+    card.appendChild(title);
+    if (q.hint) { const hint = document.createElement('div'); hint.className='muted'; hint.style.marginBottom='8px'; hint.textContent = q.hint; card.appendChild(hint); }
+    card.appendChild(text); card.appendChild(opts);
+    testContainer.appendChild(card);
+  });
+  updateNavigatorStates();
+}
+
+/* fetch questions */
+async function fetchQuestions(){
+  loadingMsg.style.display = 'none';
+  try {
+    const res = await fetch('{{ url_for("get_aptitude_questions") }}');
+    const data = await res.json();
+    questions = data.questions || [];
+    questionOrder = data.question_order || [];
+    renderQuestions();
+    renderNavigator();
+    updateProgressUI();
+    submitTopBtn.disabled = false;
+    submitBottomBtn.disabled = false;
+  } catch(e){
+    console.error('fetch error', e);
+    loadingMsg.style.display = 'block'; loadingMsg.innerHTML = '<div class="center muted">Failed to load questions.</div>';
+  }
+}
+
+/* handle submit (warn if unanswered, confirm) */
+async function handleSubmit(){
+  const total = QUESTION_COUNT; const answered = Object.keys(answers).length;
+  const remaining = total - answered;
+  if (remaining > 0) {
+    const confirmed = await showConfirmUnanswered(remaining);
+    if (!confirmed) { showInfo('Resume','Please answer remaining questions.',1400); return; }
+  }
+  await submitTest();
+}
+
+/* submit to backend */
+async function submitTest(){
+  clearInterval(timerInterval);
+  submitTopBtn.disabled = true; submitBottomBtn.disabled = true;
+  submitTopBtn.textContent = 'Submitting...'; submitBottomBtn.textContent = 'Submitting...';
+  const totalTime = Math.floor((Date.now()-startTime)/1000);
+  try {
+    const res = await fetch('{{ url_for("submit_aptitude") }}', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ answers, time_taken: totalTime, question_order: questionOrder })
+    });
+    const data = await res.json();
+    if (res.ok && data.success) {
+      showInfo('Submitted', `Score: ${data.score}/${data.total}. Redirecting...`, 2200);
+      setTimeout(()=> window.location.href = "{{ url_for('student_dashboard') }}", 2300);
+    } else {
+      showInfo('Error', data.error || 'Submission failed.', 3000);
+      submitTopBtn.disabled = false; submitBottomBtn.disabled = false;
+      submitTopBtn.textContent = 'Submit'; submitBottomBtn.textContent = 'Submit';
+    }
+  } catch(e){ console.error('submit error', e); showInfo('Error','Network error',3000); submitTopBtn.disabled=false; submitBottomBtn.disabled=false; submitTopBtn.textContent='Submit'; submitBottomBtn.textContent='Submit'; }
+}
+
+/* init on DOM load */
+document.addEventListener('DOMContentLoaded', () => {
+  testContainer = document.getElementById('test-container');
+  qnavContainer = document.getElementById('qnav');
+  timerEl = document.getElementById('timer-display');
+  progressFill = document.getElementById('progress-fill');
+  progressText = document.getElementById('progress-text');
+  submitTopBtn = document.getElementById('submit-test-btn');
+  submitBottomBtn = document.getElementById('submit-bottom-btn');
+  loadingMsg = document.getElementById('loading-message');
+
+  // render navigator shell
+  renderNavigator();
+
+  // start modal button
+  document.getElementById('start-test-btn').addEventListener('click', async () => {
+    document.getElementById('start-modal').style.display = 'none';
+    document.getElementById('main-area').classList.remove('blur-sm','pointer-events-none');
+    await requestFullScreen();
+    await startCamera();
+    fetchQuestions();
+    startTime = Date.now();
+    timerInterval = setInterval(()=> {
+      const elapsed = Math.floor((Date.now()-startTime)/1000);
+      timerEl.textContent = formatTime(elapsed);
+    },1000);
+  });
+
+  // bind submit both places
+  submitTopBtn.addEventListener('click', handleSubmit);
+  submitBottomBtn.addEventListener('click', handleSubmit);
+});
+</script>
+{% endblock %}
+
 {% block content %}
-<div id="proctorWarning" class="hidden fixed inset-0 bg-red-600 text-white flex items-center justify-center z-50">
-    <div class="text-center">
-        <i class="fas fa-exclamation-triangle text-6xl mb-4"></i>
-        <h2 class="text-3xl font-bold mb-2">WARNING!</h2>
-        <p class="text-xl" id="warningText"></p>
+<div class="container-lg">
+
+  <!-- header -->
+  <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:12px;">
+    <div>
+      <h1 style="margin:0; font-size:26px; color:#0f172a; font-weight:800;">Round 1 — Aptitude Test</h1>
+      <div class="muted" style="margin-top:6px;">{{ question_count }} Questions • Multiple Choice</div>
     </div>
+    <div style="text-align:right;">
+      <div class="muted" style="font-size:13px;">Hello, {{ current_user.first_name }}</div>
+      <div class="muted" style="font-size:13px;">{{ current_user.institute }} • {{ current_user.department }}</div>
+    </div>
+  </div>
+
+  <!-- topbar -->
+  <div class="topbar">
+    <div class="topbar-row">
+      <div class="status-block">
+        <div class="status-item">Time: <span class="timer" id="timer-display">00:00</span></div>
+        <div class="status-item muted">Progress: <span id="progress-text">0 / {{ question_count }}</span></div>
+        <div class="progress-mini"><div id="progress-fill" class="progress-fill" style="width:0%"></div></div>
+      </div>
+
+      <div style="display:flex; gap:10px; align-items:center;">
+        <button class="btn btn-primary" id="help-btn" onclick="showInfo('Instructions','Answer all MCQs. You may submit after confirmation if unanswered.',2500)">Instructions</button>
+        <button id="submit-test-btn" class="btn btn-danger" disabled>Submit</button>
+      </div>
+    </div>
+
+    <div class="topbar-nav-row">
+      <div id="qnav" class="qnav"></div>
+    </div>
+  </div>
+
+  <!-- start modal -->
+  <div id="start-modal" style="position:fixed; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(2,6,23,0.45); z-index:80;">
+    <div style="background:white; padding:24px; border-radius:12px; width:380px; text-align:center; box-shadow:0 14px 40px rgba(2,6,23,0.12);">
+      <h3 style="color:var(--primary); margin-bottom:8px; font-weight:800;">Start Aptitude Test</h3>
+      <p class="muted" style="margin-bottom:18px;">This round is proctored. Keep your camera on, remain in fullscreen and avoid switching tabs.</p>
+      <button id="start-test-btn" class="btn btn-primary" style="width:100%;">Start Test</button>
+    </div>
+  </div>
+
+  <!-- main area (blurred until start) -->
+  <div id="main-area" class="blur-sm pointer-events-none" style="margin-top:18px;">
+    <div style="display:flex; gap:14px; align-items:center; margin-bottom:12px;">
+      <div style="flex:1;">
+        <div style="background:#fff; border:1px solid #eef2ff; padding:12px; border-radius:10px; display:flex; gap:12px; align-items:center;">
+          <i class="fas fa-video" style="color:var(--danger); font-size:18px;"></i>
+          <div>
+            <div style="font-weight:700; color:#0f172a;">Proctoring Active</div>
+            <div class="muted">Camera feed & monitoring enabled</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="width:160px; flex-shrink:0;">
+        <div style="background:#fff; border:1px solid #eef2ff; padding:8px; border-radius:10px; text-align:center;">
+          <video id="cameraFeed" autoplay muted playsinline style="width:100%; height:96px; object-fit:cover; border-radius:8px; background:#f1f5f9;"></video>
+        </div>
+      </div>
+    </div>
+
+    <!-- loading -->
+    <div id="loading-message" class="question-card center">
+      <i class="fas fa-spinner fa-spin" style="margin-right:8px;"></i> Loading questions...
+    </div>
+
+    <!-- questions container -->
+    <div id="test-container" style="margin-top:14px;"></div>
+
+    <!-- bottom submit -->
+    <div style="margin-top:18px; display:flex; justify-content:center;">
+      <button id="submit-bottom-btn" class="btn btn-danger" disabled style="width:360px;">Submit Test</button>
+    </div>
+
+  </div>
 </div>
 
-<div class="max-w-4xl mx-auto">
-    <div class="bg-white rounded-lg shadow-lg p-6 mb-4">
-        <div class="flex justify-between items-center">
-            <h1 class="text-3xl font-bold">
-                <i class="fas fa-clipboard-list text-blue-600 mr-2"></i>Aptitude Test
-            </h1>
-            <div class="text-2xl font-bold text-blue-600" id="timer">60:00</div>
-        </div>
+<!-- confirm modal (Yes/No) -->
+<div id="confirm-modal" style="display:none; position:fixed; inset:0; background:rgba(2,6,23,0.45); align-items:center; justify-content:center; z-index:90;">
+  <div style="background:white; padding:20px; border-radius:10px; width:420px;">
+    <h3 id="confirm-title" style="color:var(--danger); margin-bottom:10px; font-weight:800;">Confirm</h3>
+    <div id="confirm-body" class="muted" style="margin-bottom:16px;"></div>
+    <div style="display:flex; gap:10px; justify-content:center;">
+      <button id="confirm-yes" class="btn btn-danger">Yes, Submit</button>
+      <button id="confirm-no" class="btn" style="background:#eef2ff; color:var(--primary);">No, Go Back</button>
     </div>
-    
-    <div class="bg-yellow-100 border-l-4 border-yellow-500 p-4 mb-4">
-        <p class="text-yellow-900">
-            <i class="fas fa-camera mr-2"></i>Camera is active. Stay in fullscreen. No tab switching allowed.
-        </p>
-    </div>
-    
-    <div id="cameraPreview" class="mb-4 bg-black rounded-lg overflow-hidden" style="height: 150px;">
-        <video id="videoElement" autoplay muted class="w-full h-full object-cover"></video>
-    </div>
-    
-    <div id="questionContainer" class="bg-white rounded-lg shadow-lg p-6 mb-4">
-        <div class="mb-4">
-            <span class="text-sm text-gray-600">Question <span id="currentQuestion">1</span> of <span id="totalQuestions">60</span></span>
-        </div>
-        
-        <div id="questionText" class="text-xl font-semibold mb-6"></div>
-        
-        <div id="optionsContainer" class="space-y-3">
-        </div>
-        
-        <div class="flex justify-between mt-6">
-            <button id="prevBtn" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-6 rounded-lg">
-                <i class="fas fa-arrow-left mr-2"></i>Previous
-            </button>
-            <button id="nextBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg">
-                Next<i class="fas fa-arrow-right ml-2"></i>
-            </button>
-            <button id="submitBtn" class="hidden bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-lg">
-                <i class="fas fa-check mr-2"></i>Submit Test
-            </button>
-        </div>
-    </div>
+  </div>
 </div>
 
-<script src="/static/js/proctoring.js"></script>
-<script src="/static/js/aptitude.js"></script>
+<!-- info modal -->
+<div id="info-modal" style="display:none; position:fixed; inset:0; background:rgba(2,6,23,0.25); align-items:center; justify-content:center; z-index:90;">
+  <div style="background:white; padding:16px; border-radius:10px; width:360px;">
+    <h4 id="info-title" style="color:var(--primary); margin-bottom:8px; font-weight:800;"></h4>
+    <div id="info-body" class="muted" style="margin-bottom:12px;"></div>
+  </div>
+</div>
 {% endblock %}
